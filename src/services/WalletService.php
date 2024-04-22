@@ -1,127 +1,168 @@
 <?php
 namespace Worken\Services;
 
-use Web3\Contract;
-use Web3\Web3;
-use Worken\Utils\Converter;
-use Worken\Utils\ABI;
-use Worken\Utils\KeyFactory;
-
+use Tighten\SolanaPhpSdk\Keypair;
+use Tighten\SolanaPhpSdk\PublicKey;
+use GuzzleHttp\Client;
 
 class WalletService {
-    private $web3;
+    private $rpcClient;
     private $contractAddress;
-    private $apiKey;
 
-    public function __construct(Web3 $web3, string $contractAddress, string $apiKey) {
-        $this->web3 = $web3;
+    public function __construct($rpcClient, $contractAddress) {
+        $this->rpcClient = $rpcClient;
         $this->contractAddress = $contractAddress;
-        $this->apiKey = $apiKey;
     }
 
     /**
-     * Get balance WORK tokens of given wallet address
+     * Get balance of WORK token for a given wallet address
      * 
      * @param string $address
-     * @return string Balance in WEI, Ether and Hex value
+     * @return array Balance in lamports, SOL, and Hex value
      */
     public function getBalance(string $address) {
-        $contract = new Contract($this->web3->provider, ABI::ERC20());
-        $contract->at($this->contractAddress);
+        try {
+            $client = new Client();
 
-        $result = [];
-        
-        $contract->call('balanceOf', $address, function ($err, $balance) use (&$result) {
-            if ($err !== null) {
-                return $result['error'] = $err->getMessage();
+            $response = $client->post($this->rpcClient, [
+                'json' => [
+                    'jsonrpc' => '2.0',
+                    'id' => 1,
+                    'method' => 'getTokenAccountsByOwner',
+                    'params' => [
+                        $address,
+                        ["mint" => $this->contractAddress],
+                        ["encoding" => "jsonParsed"]
+                    ]
+                ]
+            ]);
+
+            $result = json_decode($response->getBody(), true);
+            
+            if(isset($result['error'])) {
+                return ['error' => $result['error']];
             }
-            $result['WEI'] = $balance['balance']->toString();
-            $result['Ether'] = Converter::convertWEItoEther($result['WEI']); // Convert to Ether
-            $result['Hex'] = "0x" . $balance['balance']->toHex(); // 0x... hex value
-        });
 
-        return $result;
+            if (isset($result['result'])) {
+                $value = $result['result']['value'][0] ?? null;
+            
+                if ($value && isset($value['account']['data']['parsed']['info']['tokenAmount'])) {
+                    $amount = $value['account']['data']['parsed']['info']['tokenAmount']['amount'] ?? null;
+                    $decimals = $value['account']['data']['parsed']['info']['tokenAmount']['decimals'] ?? null;
+                    $uiAmount = $value['account']['data']['parsed']['info']['tokenAmount']['uiAmount'] ?? null;
+                    $uiAmountString = $value['account']['data']['parsed']['info']['tokenAmount']['uiAmountString'] ?? null;
+            
+                    $tokenAmount = [
+                        'amount' => $amount,
+                        'decimals' => $decimals,
+                        'uiAmount' => $uiAmount,
+                        'uiAmountString' => $uiAmountString
+                    ];
+            
+                    return $tokenAmount;
+                } else {
+                    return [
+                        'amount' => '0',
+                        'decimals' => 0,
+                        'uiAmount' => 0,
+                        'uiAmountString' => '0'
+                    ];
+                }
+            } else {
+                return [
+                    'amount' => '0',
+                    'decimals' => 0,
+                    'uiAmount' => 0,
+                    'uiAmountString' => '0'
+                ];
+            }
+        } catch (\Exception $e) {
+            return ['error' => $e->getMessage()];
+        }
     }
-    
+
     /**
-     * Get information about wallet
+     * Get information about a Solana wallet
      * 
      * @param string $address
      * @return array
      */
     public function getInformation(string $address) {
-        $info = [];
+        try {
+            $client = new Client();
 
-        // nonce (liczby transakcji)
-        $this->web3->eth->getTransactionCount($address, function ($err, $nonce) use (&$info) {
-            if ($err !== null) {
-                $info['nonce']['error'] = $err->getMessage();
+            $response = $client->post($this->rpcClient, [
+                'json' => [
+                    'jsonrpc' => '2.0',
+                    'id' => 1,
+                    'method' => 'getAccountInfo',
+                    'params' => [
+                        $address,
+                        ["encoding" => "base58"]
+                    ]
+                ]
+            ]);
+
+            $result = json_decode($response->getBody(), true);
+            
+            if(isset($result['error'])) {
+                return ['error' => $result['error']];
             }
-            $info['nonce'] = $nonce->toString();
-        });
 
-        // TO DO - more info about wallet
-
-        return $info;
+            if (isset($result['result'])) {
+                return $result['result']['value'] ?? null;
+            }
+        } catch (\Exception $e) {
+            return ['error' => $e->getMessage()];
+        }
     }
 
     /**
-     * Create new ETH wallet
+     * Create a new SOL wallet
      * 
-     * @param int $words Number of words for seedphrase
-     * @return array Wallet information (seedphrase, private key, public key, compressed public key, address)
+     * @return array Wallet information (private key, public key)
      */
-    public function createWallet(int $words)
-    {
-        $result = [];
-
-        $seedphrase = KeyFactory::generateSeedPhrase($words);
-        $result['seedphrase'] = $seedphrase->words;
-
-        $keys = KeyFactory::generateKeysfromSeedPhrase($seedphrase->entropy);
-        $result['privateKey'] = $keys->privateKey;
-        $result['publicKey'] = $keys->publicKey;
-        $result['publicKeyCompressed'] = $keys->publicKeyCompressed;
-        $result['address'] = KeyFactory::generateAddressfromPublicKey($keys->publicKey);
-        return $result;
+    public function createWallet() {
+        $keypair = Keypair::generate();
+        return [
+            'privateKey' => $keypair->getSecretKey(), // Serialize the key for storage/transmission
+            'publicKey' => $keypair->getPublicKey()->toBase58(),
+        ];
     }
 
     /**
-     * Get history of transactions for given address
+     * Get history of transactions for a given address
      * 
      * @param string $address
      * @return array
      */
-    public function getHistory(string $address) {
-        if (empty($this->apiKey)) {
-            $history['error'] = "Empty API key, please set WORKEN_POLYGONSCAN_APIKEY in your environment variables. You can get it from https://polygonscan.com/apis";
-        }
+    // public function getHistory(string $address) {
+    //     try {
+    //         $client = new Client();
 
-        // mainnet
-        // $url = "https://api.polygonscan.com/api?module=account&action=txlist&address={$address}&startblock=0&endblock=99999999&sort=asc&apikey={$this->apiKey}";
-        // testnet - test endpoint
-        // $url = "https://api-testnet.polygonscan.com/api?module=account&action=txlist&address={$address}&startblock=0&endblock=99999999&sort=asc&apikey={$this->apiKey}";
-        // testnet 2 - internal transactions similiar 
-        $url = "https://api-testnet.polygonscan.com/api?module=account&action=txlistinternal&address={$address}&startblock=0&endblock=99999999&sort=asc&apikey={$this->apiKey}";
-        $history = [];
-        $response = file_get_contents($url);
-        if ($response === FALSE) {
-            $history['error'] = "Error while fetching data from Polygonscan.";
-        }
+    //         $response = $client->post($this->rpcClient, [
+    //             'json' => [
+    //                 'jsonrpc' => '2.0',
+    //                 'id' => 1,
+    //                 'method' => 'getSignaturesForAddress',
+    //                 'params' => [
+    //                     $address,
+    //                     ["limit" => 5]
+    //                 ]
+    //             ]
+    //         ]);
 
-        $result = json_decode($response, true);
-    
-        if ($result['status'] == '0') {
-            if ($result['message'] == 'No transactions found') {
-                return $history;
-            }
-            $result['error'] = $result['result'];
-        }
+    //         $result = json_decode($response->getBody(), true);
+            
+    //         if(isset($result['error'])) {
+    //             return ['error' => $result['error']];
+    //         }
 
-        foreach ($result['result'] as $transaction) {
-            $history[] = $transaction;
-        }
-    
-        return $history;
-    }
+    //         if (isset($result['result'])) {
+    //             return $result['result'] ?? null;
+    //         }
+    //     } catch (\Exception $e) {
+    //         return ['error' => $e->getMessage()];
+    //     }
+    // }
 }
