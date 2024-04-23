@@ -131,38 +131,41 @@ class WalletService {
     }
 
     /**
-     * Get history of transactions for a given address
+     * Get history of transactions for a given wallet address
      * 
      * @param string $address
      * @return array
      */
-    // public function getHistory(string $address) {
-    //     try {
-    //         $client = new Client();
-
-    //         $response = $client->post($this->rpcClient, [
-    //             'json' => [
-    //                 'jsonrpc' => '2.0',
-    //                 'id' => 1,
-    //                 'method' => 'getSignaturesForAddress',
-    //                 'params' => [
-    //                     $address,
-    //                     ["limit" => 5]
-    //                 ]
-    //             ]
-    //         ]);
-
-    //         $result = json_decode($response->getBody(), true);
-            
-    //         if(isset($result['error'])) {
-    //             return ['error' => $result['error']];
-    //         }
-
-    //         if (isset($result['result'])) {
-    //             return $result['result'] ?? null;
-    //         }
-    //     } catch (\Exception $e) {
-    //         return ['error' => $e->getMessage()];
-    //     }
-    // }
+    public function getHistory(string $address, int $limit = 10) {
+        try {
+            $client = new Client();
+            // Fetching transaction signatures involving the wallet address
+            $signatureResponse = $client->post($this->rpcClient, [
+                'json' => [
+                    'jsonrpc' => '2.0',
+                    'id' => 1,
+                    'method' => 'getSignaturesForAddress',
+                    'params' => [
+                        $address,
+                        [
+                            'limit' => $limit, // Adjust the limit as necessary
+                            'options' => [
+                                'commitment' => 'confirmed'
+                            ]
+                        ]
+                    ]
+                ]
+            ]);
+    
+            $signatures = json_decode($signatureResponse->getBody()->getContents(), true);
+            $transactions = [];
+    
+            if (isset($signatures['error'])) {
+                return ['error' => $signatures['error']];
+            }
+            return $signatures['result'];
+        } catch (\Exception $e) {
+            return ['error' => $e->getMessage()];
+        }
+    }
 }
