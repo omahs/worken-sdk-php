@@ -43,19 +43,17 @@ Via Composer (tba.)
 $ composer require paidworkco/worken-sdk
 ```
 
-## Configuration
-
-To ensure flexibility and ease of integration, the Worken SDK allows for configuration through environmental variables. These variables can be set directly in your project's .env file. Below is a list of available configuration variables along with their descriptions:
-
-`WORKEN_POLYGONSCAN_APIKEY`: This is your API key, which you can generate at: https://polygonscan.com/myapikey. The API key is required for accessing PolygonScan's data programmatically and is essential for querying transaction history, block information data and other blockchain-related information on the Polygon network.
-
 ## Usage
 
-#### Initialization
+#### Initialization & Configuration
 ```php
 use Worken\Worken;
-$worken = new Worken(); // Create worken object
+$worken = new Worken("MAINNET"); // Create worken object, you can use MAINNET, TESTNET, DEVNET and LOCALNET
 ```
+- `MAINNET` - https://api.mainnet-beta.solana.com
+- `TESTNET` - https://api.testnet.solana.com
+- `DEVNET` - https://api.devnet.solana.com
+- `LOCAL` - http://localhost:8899
 ### Wallet
 #### Get wallet balance
 ```php
@@ -65,11 +63,14 @@ $worken->wallet->getBalance(string $address)
 | :-------- | :------- | :-------------------------------- |
 | `address` | `string` | **Required**. Your wallet address |
 
-This structure details the balance of a wallet in terms of the WORK token specified in contract, providing the balance in WEI, Ether, and Hexadecimal units.
+This structure details the balance of a wallet in terms of the WORK token specified in contract.
 
-- `WEI (string)`: The balance of the wallet expressed in WEI, which is the smallest denomination of Ether. Given its size, the balance is represented as a string to maintain precision. Example: `11820000000000000000000`
-- `Ether (string)`: The balance of the wallet converted into Ether, offering a more readable and commonly used representation of the balance. This conversion is necessary for understanding the balance in terms of Ether, which is more familiar to users. Example: `11820.000000000000000000`
-- `Hex (string)`: The balance of the wallet expressed as a hexadecimal value. This format is often used in lower-level blockchain operations and interactions. Example: `0x0280c373aef4bd300000`
+**Output**
+
+- `amount` (string): The balance of the wallet expressed in WORK tokens, which are the unit of your token. Due to its size, the balance is represented as a string to maintain precision. Example: 841378428
+- `decimals` (int): The number of decimal places used to accurately specify the balance of WORK tokens. Example: 5
+- `uiAmount` (float): The balance of the wallet converted to WORK tokens, providing a more readable representation of the balance. Example: 8413.78428
+- `uiAmountString` (string): The balance of the wallet converted to WORK tokens, represented as a string. Example: 8413.78428
 
 #### Get wallet information
 ```php
@@ -79,7 +80,18 @@ $worken->wallet->getInformation(string $address)
 | :-------- | :------- | :-------------------------------- |
 | `address` | `string` | **Required**. Your wallet address |
 
-- `nonce (int)`: Number of transactions on specific address, needed for send transaction.
+The `getInformation` function returns information about a specified wallet in the Solana blockchain. The data structure returned by this function includes the following types of information:
+
+**Output**
+
+- `data` (array): An array containing additional data related to the wallet. It includes two elements:
+  - Index 0: Additional data associated with the wallet, if available.
+  - Index 1: The encoding format of the wallet address (e.g., Base58).
+- `executable` (boolean): Indicates whether the wallet contains executable code.
+- `lamports` (integer): The number of lamports owned by the wallet. Lamports are the smallest unit of currency in the Solana blockchain.
+- `owner` (string): The public key of the entity that owns the wallet. It's represented as a 32-character string.
+- `rentEpoch` (float): The epoch at which the current rent state was computed for this account.
+- `space` (integer): The number of bytes of memory allocated to the wallet.
 
 *TO DO: more informations if needed*
 
@@ -91,38 +103,28 @@ $worken->wallet->getHistory(string $address)
 | :-------- | :------- | :-------------------------------- |
 | `address` | `string` | **Required**. Your wallet address |
 
-Output given in array, below specific variables.
+The `getHistory` function returns an array containing the transaction history of a specified wallet in the Solana blockchain. Each transaction record within the array consists of the following fields:
 
-- `blockNumber`: Block number in which this transaction was included. Block numbers are sequential and indicate the position of a block in the blockchain.
-- `timeStamp`: Timestamp for when the block was mined, expressed in Unix epoch time.
-- `hash`: This is the unique identifier for the transaction, also known as the transaction hash(txHash).
-- `from`: Address of the sender of the transaction.
-- `to`: Recipient's address.
-- `value`: This indicates the amount of cryptocurrency (likely Ether if this is Ethereum) that was transferred in this transaction. A value of "0" suggests that no Ether was transferred as part of this transaction, which is common for contract deployments like Worken(WORK) or other non-value transactions.
-- `contractAddress`:  Address of the contract that was created by this transaction. 
-- `input`: This field contains the data sent along with the transaction.
-- `type`: This specifies the type of transaction. 
-- `gas`: This is the maximum amount of gas the sender is willing to use for this transaction. 
-- `gasUsed`: This indicates the actual amount of gas that was used to execute the transaction. It's often less than the maximum gas specified.
-- `traceId`: This is likely an identifier used to trace the transaction through the system or in a debugging process.
-- `isError`: This field indicates whether the transaction encountered an error. A value of "0" means there was no error.
-- `errCode`: Since `isError = 0`, this field is empty. If there was an error, it might contain an error code or message indicating what went wrong.
+**Output**
+
+- `blockTime` (integer): The timestamp of the block in which the transaction was included, represented as Unix time (seconds since the Unix epoch).
+- `confirmationStatus` (string): The transaction's cluster confirmation status. The status can either be processed, confirmed, or finalized
+- `err` (mixed): Details any error encountered during the processing of the transaction, if applicable. If the transaction was successful, this field will be null.
+- `memo` (mixed): Additional information or comments associated with the transaction, if available.
+- `signature` (string): The signature of the transaction, which uniquely identifies it on the blockchain.
+- `slot` (integer): The slot in which the transaction was included in the Solana blockchain.
 
 #### Create new wallet
 ```php
-$worken->wallet->createWallet(int $words)
+$worken->wallet->createWallet()
 ```
-| Parameter | Type     | Description                                                                     |
-| :-------- | :------- | :------------------------------------------------------------------------------ |
-| `words`   | `int`    | **Required**. Count number of words in seedphrase. **Only: 12, 15, 18, 21, 24** |
 
-This structure outlines the output of the `createWallet()` function, which generates a new Ethereum wallet. It provides essential details including the seed phrase, private key, public key (both uncompressed and compressed formats), and the Ethereum address.
+The `createWallet` function returns an array containing the following key-value pairs representing the details of the newly created wallet:
 
-- `seedphrase (array)`: An array of X words that constitute the seed phrase. This phrase is crucial for wallet recovery and should be stored securely.
-- `privateKey (string)`: The private key of the wallet, expressed as a 64-character hexadecimal string. It is essential for signing transactions and should be kept confidential.
-- `publicKey (string)`: The uncompressed public key associated with the wallet, expressed as a 130-character hexadecimal string. It is derived from the private key. 
-- `publicKeyCompressed (string)`: The compressed version of the public key, expressed as a 66-character hexadecimal string. Useful for certain operations where space is a concern.
-- `address (string)`: The Ethereum address generated from the public key, expressed as a 42-character hexadecimal string. This address is used for sending and receiving funds.
+**Output**
+
+- `privateKeyBase58` (string): The private key of the wallet encoded in Base58 format. This key is essential for signing transactions and accessing the wallet's funds securely.
+- `publicKey` (string): The public key of the wallet, which serves as its unique identifier on the Solana blockchain. This key is used to receive funds and verify transactions associated with the wallet.
 
 ### Contract
 
@@ -144,30 +146,29 @@ This function give all ABI functions of Worken contract in `string`.
 
 #### Send transaction 
 ```php
-$worken->transaction->sendTransaction(string $privateKey, string $from, string $to, string $amount)
+$worken->transaction->sendTransaction(string $sourcePrivateKey, string $destinationWallet, int $amount)
 ```
 | Parameter     | Type        | Description                                                      |
 | :------------ | :---------- | :--------------------------------------------------------------- |
-| `privateKey`  | `string`    | **Required**. Sender wallet private key to authorize transaction |
-| `from`        | `string`    | **Required**. Sender wallet address (hex)                        |
-| `to`          | `string`    | **Required**. Receiver wallet address (hex)                      |
-| `amount`      | `string`    | **Required**. Amount of WORK token in WEI                        |
+| `sourcePrivateKey`  | `string`    | **Required**. Sender wallet private key to authorize transaction in base58 |                      |
+| `destinationWallet`          | `string`    | **Required**. Receiver wallet address in base58                      |
+| `amount`      | `string`    | **Required**. Amount of WORK token in Lamports                        |
 
-This function sends transaction in WORK token using Web3.
+This function sends transaction in WORK token using Solana blockchain.
 
-- `txHash (string)`: Transaction hash
+- `signature (string)`: Transaction signature
 
 #### Show transaction status
 ```php
-$worken->transaction->getTransactionStatus(string $txHash)
+$worken->transaction->getTransactionStatus(string $signature)
 ```
 | Parameter  | Type     | Description                    |
 | :--------- | :------- | :----------------------------- |
-| `txHash`   | `string` | **Required**. Transaction hash |
+| `signature`   | `string` | **Required**. Transaction signature |
 
 **Output**
 
-- `status (int)`: 0 - Success, 1 - Failed, 2 - Transaction not found or pending
+- `boolean`: true - Success, false - Failed or not found
 
 #### Show recent transactions (10)
 ```php
@@ -176,28 +177,16 @@ $worken->transaction->getRecentTransactions()
 This function gives latest 10 transactions on Worken contract. Each transaction contains the variables described below.
 
 **Output**
-- `blockNumber`: The block number in which the transaction was included. This is a unique identifier for the block on the blockchain.
-- `blockHash`: The hash of the block. This is a unique 66-character hexadecimal string identifying the block.
-- `timeStamp`: The timestamp when the block was mined, expressed as a Unix epoch time.
-- `hash`: The unique hash of the transaction. This 66-character hexadecimal string uniquely identifies the transaction on the blockchain.
-- `nonce`: A value used to ensure each transaction is processed only once by the blockchain network.
-- `transactionIndex`: The index position of the transaction in the block.
-- `from`: The address of the sender. This is the account that initiated the transaction.
-- `to`: The address of the recipient. This is the account that received the transaction. For contract creation transactions, this field may be empty.
-- `value`: The amount of Ether (in WEI) transferred in the transaction. For transactions involving the transfer of ERC-20 tokens, this value is 0, and the token transfer details are encoded in the input data.
-- `gas`: The total amount of gas provided by the sender for the transaction.
-- `gasPrice`: The price (in Wei) per unit of gas specified for the transaction.
-- `input`: The data sent along with the transaction. For simple Ether transfers, this is usually empty. For calls to contract functions, this contains the encoded function signature and parameters.
-- `methodId`: The hash of the function signature if the transaction is a call to a smart contract function.
-- `functionName`: The human-readable signature of the function called in the contract, including parameter types.
-- `contractAddress`: The contract address for contract creation transactions. For non-contract creation transactions, this field is empty.
-cumulativeGasUsed: The total amount of gas used in the block containing this transaction up until this transaction.
-- `txreceipt_status`: The status of the transaction receipt. 1 indicates success, while 0 indicates failure.
-- `gasUsed`: The amount of gas that was used by this specific transaction.
-- `confirmations`: The number of confirmations the transaction has received. This is the number of blocks added to the blockchain since the block containing this transaction.
-- `isError`: Indicates if the transaction encountered an error during execution. 0 means no error, and 1 would indicate an error occurred.
 
-TODO: receive transaction
+The getRecentTransactions function returns an array containing up to 10 recent transaction objects. Each transaction object has the following structure:
+
+- `blockTime` (int): The timestamp representing the time when the transaction was confirmed in a block on the Solana blockchain.
+- `confirmationStatus` (string): The status of the transaction confirmation, indicating whether the transaction is finalized.
+- `err` (mixed): An optional field indicating any error associated with the transaction. It may contain error details if the transaction encountered an issue during execution.
+- `memo` (mixed): An optional field that may contain additional information or notes associated with the transaction, if provided.
+- `signature` (string): The unique identifier or signature of the transaction, which can be used to reference or track the transaction on the blockchain.
+- `slot` (int): The slot number in which the transaction was included, representing its position within the Solana blockchain's transaction history.
+Each transaction object provides essential details about a specific transaction, including its confirmation status, timestamp, and any associated errors or memos.
 
 ### Network
 
