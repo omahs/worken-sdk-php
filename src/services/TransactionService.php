@@ -23,7 +23,7 @@ class TransactionService {
      * @param int $amount Amount to send
      * @return array
      */
-    public function sendTransaction($sourcePrivateKey, string $destinationWallet, $amount) {
+    public function sendTransaction(string $sourcePrivateKey, string $destinationWallet, int $amount) {
         try {
             $fromBase58 = Buffer::fromBase58($sourcePrivateKey);
             $sourceKeyPair = KeyPair::fromSecretKey($fromBase58);

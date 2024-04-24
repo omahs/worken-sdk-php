@@ -198,28 +198,15 @@ $worken->network->getBlockInformation(int $blockNumber)
 | :------------ | :------- | :---------------------------- |
 | `blockNumber` | `int`    | **Required**. Number of block |
 
-This function retrieves detailed information about a specific block on the blockchain.
+The getBlockInformation function returns an array containing information about a specific block on the Solana blockchain. The structure of the returned array is as follows:
 
 **Output**
-- `blockNumber`: The unique number of the block in which this transaction was included.
-- `timeStamp`: The timestamp when the block was mined, represented as Unix epoch time.
-- `hash`: The unique transaction identifier, a 66-character hexadecimal string.
-- `nonce`: A number used once by the sending account to prevent transaction replay attacks.
-- `blockHash`: The hash of the block containing this transaction, a 66-character hexadecimal string indicating the block's unique identifier.
-- `from`: The address of the sender.
-- `contractAddress`: The address of the contract.
-- `to`: The recipient's address. In the case of contract creation like Worken(WORK), this field may be empty.
-- `value`: The amount of Ether (or the token's smallest unit if an ERC-20 transaction) transferred, in Wei.
-- `tokenName`: The name of the token being transferred, if applicable.
-- `tokenSymbol`: The symbol of the token being transferred, if applicable.
-- `tokenDecimal`: The decimal places of the token, indicating how the token's value can be divided.
-- `transactionIndex`: The index position of the transaction within the block.
-- `gas`: The maximum amount of gas the sender is willing to use for the transaction.
-- `gasPrice`: The price (in Wei) per unit of gas the sender is willing to pay.
-- `gasUsed`: The actual amount of gas used for processing the transaction.
-- `cumulativeGasUsed`: The total amount of gas used in the block up until this transaction.
-- `input`: The data sent along with the transaction. For some transactions, this may be 'deprecated' or contain the input data to a contract call.
-- `confirmations`: The number of confirmations the transaction has received, indicating how many blocks have been mined since this transaction's block.
+
+- `blockHeight` (int): The height or number of the block within the blockchain.
+- `blockTime` (int): The timestamp representing the time when the block was created or finalized.
+- `blockhash` (string): The unique identifier or hash of the block.
+- `parentSlot` (int): The slot number of the parent block, indicating the relationship between blocks in the blockchain.
+- `previousBlockhash` (string): The hash of the previous block in the blockchain, establishing the link between consecutive blocks.
 
 #### Show estimated gas
 ```php
@@ -264,6 +251,11 @@ Example: `true`
 $worken->network->getMonitorCongestion()
 ```
 
-- `Safe (float)`: The recommended gas price for transactions expected to be confirmed within a reasonable time frame without overpaying. Measured in Gwei. Example: `50.5`
-- `Propose (float)`: The gas price suggested for transactions that are slightly more urgent and aim for a faster confirmation time than those marked as Safe. Measured in Gwei. Example: `57.1`
-- `Fast (float)`: The highest gas price recommended for transactions that need to be confirmed as quickly as possible. Measured in Gwei. Example: `57.6`
+The `getMonitorCongestion` function returns an array containing performance samples for monitoring congestion on the Solana blockchain. The structure of the returned array is as follows:
+
+- `performanceSamples` (array): An array of performance samples, each containing the following information:
+  - `numNonVoteTransactions` (int): The number of non-vote transactions processed during the sample period.
+  - `numSlots` (int): The number of slots processed during the sample period.
+  - `numTransactions` (int): The total number of transactions processed during the sample period.
+  - `samplePeriodSecs` (int): The duration of the sample period in seconds.
+  - `slot` (int): The slot number corresponding to the end of the sample period.
