@@ -1,149 +1,162 @@
 <?php
 namespace Worken\Services;
 
-use Web3\Web3;
-use Web3\Contract;
-use Web3\Utils;
-use Worken\Utils\Converter;
-use Worken\Utils\ABI;
+use GuzzleHttp\Client;
+use Tighten\SolanaPhpSdk\Util\Buffer;
+use Tighten\SolanaPhpSdk\Keypair;
+use Worken\Utils\TokenProgram;
 
 class NetworkService {
-    private $web3;
+    private $rpcClient;
     private $contractAddress;
-    private $apiKey;
-    private $contract;
+    private $client;
 
-    public function __construct(Web3 $web3, string $contractAddress, string $apiKey) {
-        $this->web3 = $web3;
-        $this->apiKey = $apiKey;
+    public function __construct($rpcClient, $contractAddress) {
+        $this->rpcClient = $rpcClient;
         $this->contractAddress = $contractAddress;
-        $this->contract = new Contract($this->web3->provider, ABI::ERC20());
-        $this->contract->at($this->contractAddress);
+        $this->client = new Client();
     }
 
     /**
      * Get block information
      * 
-     * @param string $blockNumber block number in Hex
+     * @param string $blockNumber block number 
      * @return array
      */
-    public function getBlockInformation(string $blockNumber) { 
-        // mainnet 
-        //$url = "https://api.polygonscan.com/api?module=account&action=tokentx&contractaddress={$this->contractAddress}&startblock={$blockNumber}&endblock={$blockNumber}&sort=asc&apikey={$this->apiKey}";
-        // testnet
-        $url = "https://api-testnet.polygonscan.com/api?module=account&action=tokentx&contractaddress={$this->contractAddress}&startblock={$blockNumber}&endblock={$blockNumber}&sort=asc&apikey={$this->apiKey}";
-        $response = file_get_contents($url);
-        $result = json_decode($response, true);
-    
-        if ($result['status'] == '1' && $result['message'] == 'OK') {
+    public function getBlockInformation(int $blockNumber) {
+        try {
+            $client = new Client();
+            $response = $client->post($this->rpcClient, [
+                'json' => [
+                    'jsonrpc' => '2.0',
+                    'id' => 1,
+                    'method' => 'getBlock',
+                    'params' => [
+                        $blockNumber,
+                        [
+                            "encoding" => "jsonParsed",
+                            "transactionDetails" => "none",
+                            "maxSupportedTransactionVersion" => 0,
+                            "rewards" => false
+                        ]
+                    ]
+                ]
+            ]);
+
+            $result = json_decode($response->getBody(), true);
             return $result['result'];
-        } else {
-            $return['error'] = $result['message'];
-            return $return;
+        } catch (\Exception $e) {
+            return ['error' => $e->getMessage()];
         }
     }
 
     /**
-     * Get estimated gas for transaction (in WEI, Ether and Hex value)
+     * Get estimated fee for transaction
      * 
-     * @param string $from Sender address in Hex
-     * @param string $to Receiver address in Hex
-     * @param string $amount Amount to send in WEI
+     * @param string $from Sender private key in base58
+     * @param string $to Receiver address
+     * @param string $amount Amount to send
      * @return array
      */
-    public function getEstimatedGas(string $from, string $to, string $amount) {
-        $info = [];
-        $result = [];
-        $data = '0x' . $this->contract->getData('transfer', $to, $amount);
+    public function getEstimatedFee(string $fromPrivateKey, string $to, int $amount) {
+        try {
+            $fromBase58 = Buffer::fromBase58($fromPrivateKey);
+            $sourceKeyPair = KeyPair::fromSecretKey($fromBase58);
+            $transaction = TokenProgram::prepareTransaction($sourceKeyPair->getPublicKey(), $to, $amount, $this->contractAddress, $this->rpcClient);
 
-        $transaction = [
-            'from' => $from,
-            'to' => $this->contractAddress,
-            'data' => $data
-        ];
-
-        $this->web3->eth->estimateGas($transaction, function ($err, $gas) use (&$info) {
-            if ($err !== null) {
-                $info['error'] = $err->getMessage();
-            } else {
-                $info['estimatedGas'] = $gas; 
-            }
-        });
-        $gasValue = $info['estimatedGas']; 
-        $result['WEI'] = $gasValue->toString(); // in WEI
-        $result['Ether'] = Converter::convertWEItoEther($result['WEI']); // Convert to Ether
-        $result['Hex'] = "0x" . $gasValue->toHex(); // 0x... hex value
-        return $result;
+            $transaction->sign($sourceKeyPair); 
+            $rawBinaryString = $transaction->serialize(false);
+            $hashString = sodium_bin2base64($rawBinaryString, SODIUM_BASE64_VARIANT_ORIGINAL);
+            $response = $this->client->post($this->rpcClient, [
+                'json' => [
+                    'jsonrpc' => '2.0',
+                    'id' => 1,
+                    'method' => 'getFeeForMessage',
+                    'params' => [
+                        $hashString,
+                        ['encoding' => 'base64', 'preflightCommitment' => 'confirmed'] 
+                    ]
+                ]
+            ]);
+        
+            $result = json_decode($response->getBody()->getContents(), true);
+            return var_dump($result);
+        } catch (\Exception $e) {
+            return ['error' => $e->getMessage()];
+        }   
     }
 
     /**
-     * Get network status information (latest block, hashrate, gas price, syncing status)
+     * Get network status information (block height, fee rate)
      * 
      * @return array
      */
     public function getNetworkStatus() {
-        $status = [];
-    
-        // Get latest block number
-        $this->web3->eth->blockNumber(function ($err, $block) use (&$status) {
-            if ($err !== null) {
-                $status['latestBlock']['error'] = $err->getMessage();
-            }
-            $status['latestBlock'] = intval($block->toString());
-        });
+        try {
+            $status = [];
 
-        // Get hashrate of the network
-        $this->web3->eth->hashrate(function ($err, $hashrate) use (&$status) {
-            if ($err !== null) {
-                $status['hashrate']['error'] = $err->getMessage();
+            $response = $this->client->post($this->rpcClient, [
+                'json' => [
+                    'jsonrpc' => '2.0',
+                    'id' => 1,
+                    'method' => 'getBlockHeight'
+                ]
+            ]);
+            $blockData = json_decode($response->getBody(), true);
+            if (isset($blockData['result'])) {
+                $status['latestBlock'] = $blockData['result'];
+            } else {
+                $status['latestBlock'] = 'Error fetching block height';
             }
-            $status['hashrate'] = $hashrate->toString();
-        });
-    
-        // Get gas price
-        $this->web3->eth->gasPrice(function ($err, $gasPrice) use (&$status) {
-            if ($err !== null) {
-                $status['gasPrice']['error'] = $err->getMessage();
-            }
-            $status['gasPrice']['WEI'] = $gasPrice->toString(); 
-            $status['gasPrice']['Ether'] = Converter::convertWEItoEther($gasPrice->toString()); 
-            $status['gasPrice']['Hex'] = "0x" . $gasPrice->toHex(); // 0x... hex value
-        });
 
-        // Get syncing status
-        $this->web3->eth->syncing(function ($err, $syncing) use (&$status){
-            if ($err !== null) {
-                $status['syncStatus']['error'] = $err->getMessage();
+            $response = $this->client->post($this->rpcClient, [
+                'json' => [
+                    'jsonrpc' => '2.0',
+                    'id' => 1,
+                    'method' => 'getFeeCalculatorForBlockhash',
+                    'params' => ["recent", ["commitment" => "finalized"]]
+                ]
+            ]);
+            $feeData = json_decode($response->getBody(), true);
+            if (isset($feeData['result']['value']['feeCalculator'])) {
+                $status['feeRateLamportsPerSignature'] = $feeData['result']['value']['feeCalculator']['lamportsPerSignature'];
+            } else {
+                $status['feeRateLamportsPerSignature'] = 'Error fetching fee calculator';
             }
-            $status['syncStatus'] = $syncing;
-        });
-        return $status;
+
+            return $status;
+        } catch (\Exception $e) {
+            return ['error' => $e->getMessage()];
+        }
     }
 
     /**
-     * Get congestion status of the network (Safe, Propose, Fast gas price)
+     * Get congestion status of the network
      * 
      * @return array
      */
     public function getMonitorCongestion() {
-        $status = [];
-        // mainnet
-        // $url = "https://api.polygonscan.com/api?module=gastracker&action=gasoracle&apikey={$this->apiKey}";
-        // testnet
-        $url = "https://api-testnet.polygonscan.com/api?module=gastracker&action=gasoracle&apikey={$this->apiKey}";
-        $gasData = file_get_contents($url);
-        if ($gasData !== false) {
-            $gasData = json_decode($gasData, true);
-            if ($gasData['status'] == '1' && isset($gasData['result'])) {
-                $status['Safe'] = (float)$gasData['result']['SafeGasPrice'];
-                $status['Propose'] = (float)$gasData['result']['ProposeGasPrice'];
-                $status['Fast'] = (float)$gasData['result']['FastGasPrice'];
+        try {
+            $status = [];
+
+            $response = $this->client->post($this->rpcClient, [
+                'json' => [
+                    'jsonrpc' => '2.0',
+                    'id' => 1,
+                    'method' => 'getRecentPerformanceSamples',
+                    'params' => [5]  
+                ]
+            ]);
+            $congestionData = json_decode($response->getBody(), true);
+            if (isset($congestionData['result'])) {
+                $status['performanceSamples'] = $congestionData['result'];
             } else {
-                $status['error'] = "Could not retrieve gas price data";
+                $status['performanceSamples'] = 'Error fetching performance data';
             }
-        } else {
-            $status['error'] = "Failed to connect to Polygonscan API";
+
+            return $status;
+        } catch (\Exception $e) {
+            return ['error' => $e->getMessage()];
         }
-        return $status;
     }
 }

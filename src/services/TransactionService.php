@@ -2,10 +2,9 @@
 namespace Worken\Services;
 
 use GuzzleHttp\Client;
-use Tighten\SolanaPhpSdk\KeyPair;
-use Tighten\SolanaPhpSdk\PublicKey;
-use Tighten\SolanaPhpSdk\Transaction;
 use Worken\Utils\TokenProgram;
+use Tighten\SolanaPhpSdk\KeyPair;
+use Tighten\SolanaPhpSdk\Util\Buffer;
 
 class TransactionService {
     private $rpcClient;
@@ -17,67 +16,65 @@ class TransactionService {
     }
 
     /**
-     * Send transaction
+     * Send transaction in Worken SPL token
      * 
-     * @param string $privateKey Sender private key
-     * @param string $from Sender address in Hex
-     * @param string $to Receiver address in Hex
-     * @param string $amount Amount to send in WEI
+     * @param string $sourcePubKey Sender private key in base58
+     * @param string $destinationWallet Receiver wallet address
+     * @param int $amount Amount to send
      * @return array
      */
     public function sendTransaction($sourcePrivateKey, string $destinationWallet, $amount) {
-        //Generate keypair for tests
-        // $keypair = Keypair::generate();
-        // $fromSecretKey = $keypair->secretKey;
-        $fromKeyPair = KeyPair::fromSecretKey($sourcePrivateKey);
-        $toPublicKey = new PublicKey($destinationWallet);
-        $mintAddress = new PublicKey($this->contractAddress); 
-        
-        $instruction = TokenProgram::transfer(
-            $fromKeyPair->getPublicKey(),
-            $toPublicKey,
-            $mintAddress,
-            $fromKeyPair->getPublicKey(), 
-            $amount
-        );
+        try {
+            $fromBase58 = Buffer::fromBase58($sourcePrivateKey);
+            $sourceKeyPair = KeyPair::fromSecretKey($fromBase58);
+    
+            $transaction = TokenProgram::prepareTransaction($sourceKeyPair->getPublicKey(), $destinationWallet, $amount, $this->contractAddress, $this->rpcClient);
+    
+            $transaction->sign($sourceKeyPair); 
 
-        $transaction = new Transaction($fromKeyPair->getPublicKey());
-        $transaction->add($instruction);
-
-        $client = new Client();
-        $response = $client->post($this->rpcClient, [
-            'json' => [
-                'jsonrpc' => '2.0',
-                'id' => 1,
-                'method' => 'sendTransaction',
-                'params' => [
-                    $transaction->serialize(),
-                    ['encoding' => 'base64']
+            $rawBinaryString = $transaction->serialize(false);
+            $hashString = sodium_bin2base64($rawBinaryString, SODIUM_BASE64_VARIANT_ORIGINAL);
+    
+            $client = new Client();
+            $response = $client->post($this->rpcClient, [
+                'json' => [
+                    'jsonrpc' => '2.0',
+                    'id' => 1,
+                    'method' => 'sendTransaction',
+                    'params' => [
+                        $hashString,
+                        ['encoding' => 'base64']
+                    ]
                 ]
-            ]
-        ]);
-
-        $result = json_decode($response->getBody(), true);
-        return $result;
+            ]);
+    
+            $result = json_decode($response->getBody(), true);
+            if (isset($result['error'])) {
+                return ['error' => $result['error']];
+            }
+            return $result;
+        } catch (\Exception $e) {
+            return ['error' => $e->getMessage()];
+        }
     }
 
     /**
      * Get transaction status
      * 
-     * @param string $txHash Transaction hash
+     * @param string $signature Transaction hash
      * @return int true - success, false - error
      */
     public function getTransactionStatus(string $signature) {
-        $client = new Client();
         try {
-            $response = $client->post('', [
+            $client = new Client();
+            $response = $client->post($this->rpcClient, [
                 'json' => [
                     'jsonrpc' => '2.0',
                     'id'      => 1,
-                    'method'  => 'getTransaction',
+                    'method'  => 'getSignatureStatuses',
                     'params'  => [
-                        $signature,
-                        'json'
+                        [$signature],
+                        ['searchTransactionHistory' => true]
                     ]
                 ]
             ]);
@@ -89,47 +86,47 @@ class TransactionService {
                 throw new \Exception("Error returned by the API: " . $data['error']['message']);
             }
 
-            if (isset($data['result']) && isset($data['result']['meta']) && $data['result']['meta']['err'] === null) {
+            if (isset($data['result']) && isset($data['result']['value']) && $data['result']['value'][0]['err'] === null) {
                 return true;
             } else {
                 return false; 
             }
         } catch (\Exception $e) {
-            error_log('Exception caught while getting transaction status: ' . $e->getMessage());
-            return false;
+            return ['error' => $e->getMessage()];
         }
     }
 
     /** 
-     * Get 10 recent transactions of the contract - need to switch to solana
+     * Get 10 recent transactions of the Worken SPL token
      * 
      * @return array
      */
     public function getRecentTransactions() {
-        // testnet
-        $url = "https://api-testnet.polygonscan.com/api?module=account&action=txlist&address={$this->contractAddress}&startblock=0&endblock=99999999&page=1&offset=10&sort=desc&apikey={$this->apiKey}";
-        // mainnet
-        // $url = "https://api.polygonscan.com/api?module=account&action=txlist&address={$this->contractAddress}&startblock=0&endblock=99999999&page=1&offset=10&sort=desc&apikey={$this->apiKey}";
-        $history = [];
-        $response = file_get_contents($url);
-        if ($response === FALSE) {
-            $history['error'] = "Error while fetching data from Polygonscan.";
-        }
-
-        $result = json_decode($response, true);
-
-        if ($result['status'] == '0') {
-            if ($result['message'] == 'No transactions found') {
-                return $history;
+        try {
+            $client = new Client();
+            // Fetching transaction signatures involving the wallet address
+            $signatureResponse = $client->post($this->rpcClient, [
+                'json' => [
+                    'jsonrpc' => '2.0',
+                    'id' => 1,
+                    'method' => 'getSignaturesForAddress',
+                    'params' => [
+                        $this->contractAddress,
+                        [
+                            'limit' => 10, // Adjust the limit as necessary
+                        ]
+                    ]
+                ]
+            ]);
+    
+            $signatures = json_decode($signatureResponse->getBody()->getContents(), true);
+    
+            if (isset($signatures['error'])) {
+                return ['error' => $signatures['error']];
             }
-            $result['error'] = $result['result'];
+            return $signatures['result'];
+        } catch (\Exception $e) {
+            return ['error' => $e->getMessage()];
         }
-
-        if ($result['status'] == '1' && !empty($result['result'])) {
-            foreach ($result['result'] as $transaction) {
-                $history[] = $transaction;
-            }
-        }
-        return $history;
     }
 }

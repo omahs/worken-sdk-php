@@ -28,8 +28,8 @@ class Worken {
         $nodeUrl = $this->resolveRpcUrl($rpcChoice);
 
         $this->wallet = new WalletService($nodeUrl, $contractAddress);
-        //$this->contract = new ContractService($this->web3, $this->contractAddress, $this->apiKey);
-        //$this->network = new NetworkService($this->web3, $this->contractAddress, $this->apiKey);
+        $this->contract = new ContractService($nodeUrl, $contractAddress);
+        $this->network = new NetworkService($nodeUrl, $contractAddress);
         $this->transaction = new TransactionService($nodeUrl, $contractAddress);
     }
 

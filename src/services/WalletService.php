@@ -125,7 +125,7 @@ class WalletService {
     public function createWallet() {
         $keypair = Keypair::generate();
         return [
-            'privateKey' => $keypair->getSecretKey(), // Serialize the key for storage/transmission
+            'privateKeyBase58' => $keypair->getSecretKey()->toBase58String(),
             'publicKey' => $keypair->getPublicKey()->toBase58(),
         ];
     }
