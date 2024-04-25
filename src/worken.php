@@ -13,7 +13,6 @@ class Worken {
     public $transaction;
     public $contract;
     public $network;
-    private $solana;
 
     const LOCAL_ENDPOINT = 'http://localhost:8899';
     const DEVNET_ENDPOINT = 'https://api.devnet.solana.com';
@@ -24,13 +23,13 @@ class Worken {
      * Worken-SDK constructor
      */
     public function __construct($rpcChoice) {
-        $contractAddress = "9tnkusLJaycWpkzojAk5jmxkdkxBHRkFNVSsa7tPUgLb";
+        $mintAddress = "9tnkusLJaycWpkzojAk5jmxkdkxBHRkFNVSsa7tPUgLb";
         $nodeUrl = $this->resolveRpcUrl($rpcChoice);
 
-        $this->wallet = new WalletService($nodeUrl, $contractAddress);
-        $this->contract = new ContractService($nodeUrl, $contractAddress);
-        $this->network = new NetworkService($nodeUrl, $contractAddress);
-        $this->transaction = new TransactionService($nodeUrl, $contractAddress);
+        $this->wallet = new WalletService($nodeUrl, $mintAddress);
+        $this->contract = new ContractService($nodeUrl, $mintAddress);
+        $this->network = new NetworkService($nodeUrl);
+        $this->transaction = new TransactionService($nodeUrl, $mintAddress);
     }
 
     private function resolveRpcUrl($choice) {

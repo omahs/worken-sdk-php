@@ -7,11 +7,13 @@ class ContractService
 {
     private $rpcClient;
     private $contractAddress;
+    private $client;
 
     public function __construct($rpcClient, $contractAddress)
     {
         $this->rpcClient = $rpcClient;
         $this->contractAddress = $contractAddress;
+        $this->client = new Client();
     }
 
     /**
@@ -24,8 +26,7 @@ class ContractService
         try {
             $result = [];
 
-            $client = new Client();
-            $response = $client->post($this->rpcClient, [
+            $response = $this->client->post($this->rpcClient, [
                 'json' => [
                     'jsonrpc' => '2.0',
                     'id' => 1,

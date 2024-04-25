@@ -3,15 +3,18 @@ namespace Worken\Services;
 
 use Tighten\SolanaPhpSdk\Keypair;
 use Tighten\SolanaPhpSdk\PublicKey;
+use Worken\Utils\KeyFactory;
 use GuzzleHttp\Client;
 
 class WalletService {
     private $rpcClient;
-    private $contractAddress;
+    private $mintAddress;
+    private $client;
 
-    public function __construct($rpcClient, $contractAddress) {
+    public function __construct($rpcClient, $mintAddress) {
         $this->rpcClient = $rpcClient;
-        $this->contractAddress = $contractAddress;
+        $this->mintAddress = $mintAddress;
+        $this->client = new Client();
     }
 
     /**
@@ -22,16 +25,14 @@ class WalletService {
      */
     public function getBalance(string $address) {
         try {
-            $client = new Client();
-
-            $response = $client->post($this->rpcClient, [
+            $response = $this->client->post($this->rpcClient, [
                 'json' => [
                     'jsonrpc' => '2.0',
                     'id' => 1,
                     'method' => 'getTokenAccountsByOwner',
                     'params' => [
                         $address,
-                        ["mint" => $this->contractAddress],
+                        ["mint" => $this->mintAddress],
                         ["encoding" => "jsonParsed"]
                     ]
                 ]
@@ -89,9 +90,7 @@ class WalletService {
      */
     public function getInformation(string $address) {
         try {
-            $client = new Client();
-
-            $response = $client->post($this->rpcClient, [
+            $response = $this->client->post($this->rpcClient, [
                 'json' => [
                     'jsonrpc' => '2.0',
                     'id' => 1,
@@ -118,13 +117,17 @@ class WalletService {
     }
 
     /**
-     * Create a new SOL wallet
+     * Create a new SOL wallet, remember to store the seed phrase securely
      * 
-     * @return array Wallet information (private key, public key)
+     * @param int $words Number of words for the mnemonic (default 12 words, 24 words is also common) 
+     * 
+     * @return array Wallet information (seedphrase, private key, public key)
      */
-    public function createWallet() {
-        $keypair = Keypair::generate();
+    public function createWallet(int $words = 12) {
+        $seed = KeyFactory::generateMnemonic($words);
+        $keypair = Keypair::fromSeed($seed->entropy);
         return [
+            'seedPhrase' => $seed->words,
             'privateKeyBase58' => $keypair->getSecretKey()->toBase58String(),
             'publicKey' => $keypair->getPublicKey()->toBase58(),
         ];
