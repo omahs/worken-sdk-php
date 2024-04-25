@@ -47,7 +47,8 @@ class TransactionService {
             if (isset($result['error'])) {
                 return ['error' => $result['error']];
             }
-            return $result;
+            $signature = $result['result'];
+            return $signature;
         } catch (\Exception $e) {
             return ['error' => $e->getMessage()];
         }
@@ -82,7 +83,9 @@ class TransactionService {
             if (isset($result['error'])) {
                 return ['error' => $result['error']];
             }
-            return $result;
+
+            $fee = $result['result']['value']['fee'];
+            return $fee;
         } catch (\Exception $e) {
             return ['error' => $e->getMessage()];
         }
