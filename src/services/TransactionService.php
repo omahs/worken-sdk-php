@@ -5,38 +5,33 @@ use GuzzleHttp\Client;
 use Worken\Utils\TokenProgram;
 use Tighten\SolanaPhpSdk\KeyPair;
 use Tighten\SolanaPhpSdk\Util\Buffer;
+use Tighten\SolanaPhpSdk\PublicKey;
+use Tighten\SolanaPhpSdk\Transaction;
+
 
 class TransactionService {
     private $rpcClient;
-    private $contractAddress;
+    private $mintAddress;
+    private $client;
 
-    public function __construct($rpcClient, $contractAddress) {
+    public function __construct($rpcClient, $mintAddress) {
         $this->rpcClient = $rpcClient;
-        $this->contractAddress = $contractAddress;
+        $this->mintAddress = $mintAddress;
+        $this->client = new Client();
     }
 
     /**
      * Send transaction in Worken SPL token
      * 
-     * @param string $sourcePubKey Sender private key in base58
+     * @param string $sourcePrivateKey Sender private key in base58
      * @param string $destinationWallet Receiver wallet address
-     * @param int $amount Amount to send
+     * @param int $amount Amount to send in WORKEN
      * @return array
      */
     public function sendTransaction(string $sourcePrivateKey, string $destinationWallet, int $amount) {
         try {
-            $fromBase58 = Buffer::fromBase58($sourcePrivateKey);
-            $sourceKeyPair = KeyPair::fromSecretKey($fromBase58);
-    
-            $transaction = TokenProgram::prepareTransaction($sourceKeyPair->getPublicKey(), $destinationWallet, $amount, $this->contractAddress, $this->rpcClient);
-    
-            $transaction->sign($sourceKeyPair); 
-
-            $rawBinaryString = $transaction->serialize(false);
-            $hashString = sodium_bin2base64($rawBinaryString, SODIUM_BASE64_VARIANT_ORIGINAL);
-    
-            $client = new Client();
-            $response = $client->post($this->rpcClient, [
+            $hashString = TokenProgram::prepareTransaction($sourcePrivateKey, $destinationWallet, $amount, $this->mintAddress, $this->rpcClient);
+            $response = $this->client->post($this->rpcClient, [
                 'json' => [
                     'jsonrpc' => '2.0',
                     'id' => 1,
@@ -58,6 +53,41 @@ class TransactionService {
         }
     }
 
+    
+    /**
+     * Get estimated fee for the transaction
+     * 
+     * @param string $sourcePrivateKey Sender private key in base58
+     * @param string $destinationWallet Receiver wallet address
+     * @param int $amount Amount to send in WORKEN
+     * 
+     * @return array
+     */
+    public function getEstimatedFee(string $sourcePrivateKey, string $destinationWallet, int $amount) {
+        try {
+            $hashString = TokenProgram::prepareTransaction($sourcePrivateKey, $destinationWallet, $amount, $this->mintAddress, $this->rpcClient);
+            $response = $this->client->post($this->rpcClient, [
+                'json' => [
+                    'jsonrpc' => '2.0',
+                    'id' => 1,
+                    'method' => 'getFeeForMessage',
+                    'params' => [
+                        $hashString,
+                        ['encoding' => 'base64', "commitment" => "processed"]
+                    ]
+                ]
+            ]);
+    
+            $result = json_decode($response->getBody()->getContents(), true);
+            if (isset($result['error'])) {
+                return ['error' => $result['error']];
+            }
+            return $result;
+        } catch (\Exception $e) {
+            return ['error' => $e->getMessage()];
+        }
+    }
+
     /**
      * Get transaction status
      * 
@@ -66,8 +96,7 @@ class TransactionService {
      */
     public function getTransactionStatus(string $signature) {
         try {
-            $client = new Client();
-            $response = $client->post($this->rpcClient, [
+            $response = $this->client->post($this->rpcClient, [
                 'json' => [
                     'jsonrpc' => '2.0',
                     'id'      => 1,
@@ -103,15 +132,14 @@ class TransactionService {
      */
     public function getRecentTransactions() {
         try {
-            $client = new Client();
             // Fetching transaction signatures involving the wallet address
-            $signatureResponse = $client->post($this->rpcClient, [
+            $signatureResponse = $this->client->post($this->rpcClient, [
                 'json' => [
                     'jsonrpc' => '2.0',
                     'id' => 1,
                     'method' => 'getSignaturesForAddress',
                     'params' => [
-                        $this->contractAddress,
+                        $this->mintAddress,
                         [
                             'limit' => 10, // Adjust the limit as necessary
                         ]

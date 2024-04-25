@@ -2,18 +2,13 @@
 namespace Worken\Services;
 
 use GuzzleHttp\Client;
-use Tighten\SolanaPhpSdk\Util\Buffer;
-use Tighten\SolanaPhpSdk\Keypair;
-use Worken\Utils\TokenProgram;
 
 class NetworkService {
     private $rpcClient;
-    private $contractAddress;
     private $client;
 
-    public function __construct($rpcClient, $contractAddress) {
+    public function __construct($rpcClient) {
         $this->rpcClient = $rpcClient;
-        $this->contractAddress = $contractAddress;
         $this->client = new Client();
     }
 
@@ -48,42 +43,6 @@ class NetworkService {
         } catch (\Exception $e) {
             return ['error' => $e->getMessage()];
         }
-    }
-
-    /**
-     * Get estimated fee for transaction
-     * 
-     * @param string $from Sender private key in base58
-     * @param string $to Receiver address
-     * @param string $amount Amount to send
-     * @return array
-     */
-    public function getEstimatedFee(string $fromPrivateKey, string $to, int $amount) {
-        try {
-            $fromBase58 = Buffer::fromBase58($fromPrivateKey);
-            $sourceKeyPair = KeyPair::fromSecretKey($fromBase58);
-            $transaction = TokenProgram::prepareTransaction($sourceKeyPair->getPublicKey(), $to, $amount, $this->contractAddress, $this->rpcClient);
-
-            $transaction->sign($sourceKeyPair); 
-            $rawBinaryString = $transaction->serialize(false);
-            $hashString = sodium_bin2base64($rawBinaryString, SODIUM_BASE64_VARIANT_ORIGINAL);
-            $response = $this->client->post($this->rpcClient, [
-                'json' => [
-                    'jsonrpc' => '2.0',
-                    'id' => 1,
-                    'method' => 'getFeeForMessage',
-                    'params' => [
-                        $hashString,
-                        ['encoding' => 'base64', 'preflightCommitment' => 'confirmed'] 
-                    ]
-                ]
-            ]);
-        
-            $result = json_decode($response->getBody()->getContents(), true);
-            return var_dump($result);
-        } catch (\Exception $e) {
-            return ['error' => $e->getMessage()];
-        }   
     }
 
     /**
