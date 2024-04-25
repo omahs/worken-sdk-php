@@ -116,13 +116,17 @@ The `getHistory` function returns an array containing the transaction history of
 
 #### Create new wallet
 ```php
-$worken->wallet->createWallet()
+$worken->wallet->createWallet(int $words = 12)
 ```
+| Parameter | Type     | Description                       |
+| :-------  | :------- | :-------------------------------- |
+| `words`   | `int` | **Required**. Choose amount of seedphrase words (12 or 24) |
 
 The `createWallet` function returns an array containing the following key-value pairs representing the details of the newly created wallet:
 
 **Output**
 
+- `seedPhrase` (array): The seedphrase for recovering wallet. 12 or 24 words
 - `privateKeyBase58` (string): The private key of the wallet encoded in Base58 format. This key is essential for signing transactions and accessing the wallet's funds securely.
 - `publicKey` (string): The public key of the wallet, which serves as its unique identifier on the Solana blockchain. This key is used to receive funds and verify transactions associated with the wallet.
 
@@ -136,27 +140,63 @@ $worken->contract->getContractStatus()
 
 - `status(boolean)`: `true` - contract active, `false` - contract unactive & freezed
 
-#### Show contract functions
+<!-- #### Show contract functions
 ```php
 $worken->contract->getContractFunctions()
 ```
-This function give all ABI functions of Worken contract in `string`.
+This function give all ABI functions of Worken contract in `string`. -->
 
 ### Transactions
 
-#### Send transaction 
+#### Example sending transaction in Worken using SDK
 ```php
-$worken->transaction->sendTransaction(string $sourcePrivateKey, string $destinationWallet, int $amount)
+<?php
+require_once 'vendor/autoload.php';
+use Worken\Worken;
+
+$worken = new Worken('MAINNET');
+$hashString = $worken->transaction->prepareTransaction("21ZcK4YbmSPF2dDSBwZ6dSMktcPv7vRREEi86woq8tj3NCxefZfTMFfh5KebNsLrFmCsKchXxPfHSokX24aXtmRK", "DBdtqVQcby2YoPVVAH4jXgubeSR9HANvPrSo24DVUQB5", 5); // example data
+$fee = $worken->transaction->getEstimatedFee($hashString);
+$signature = $worken->transaction->sendTransaction($hashString);
+```
+
+#### Prepare transaction 
+```php
+$worken->transaction->prepareTransaction(string $sourcePrivateKey, string $destinationWallet, int $amount)
 ```
 | Parameter     | Type        | Description                                                      |
 | :------------ | :---------- | :--------------------------------------------------------------- |
 | `sourcePrivateKey`  | `string`    | **Required**. Sender wallet private key to authorize transaction in base58 |                      |
 | `destinationWallet`          | `string`    | **Required**. Receiver wallet address in base58                      |
-| `amount`      | `string`    | **Required**. Amount of WORK token in Lamports                        |
+| `amount`      | `string`    | **Required**. Amount of WORK token 1 = 0.00001                        |
 
-This function sends transaction in WORK token using Solana blockchain.
+This function prepare transaction in WORK token using Solana blockchain.
+
+- `hashString (string)`: Transaction hashString
+
+#### Send transaction 
+```php
+$worken->transaction->sendTransaction(string $hashString)
+```
+| Parameter     | Type        | Description                                                      |
+| :------------ | :---------- | :--------------------------------------------------------------- |
+| `hashString`  | `string`    | **Required**. Prepared transaction in base64 |                      |
+
+This function send prepared transaction using Solana blockchain.
 
 - `signature (string)`: Transaction signature
+
+#### Show estimated fee
+```php
+$worken->network->getEstimatedFee(string $hashString)
+```
+| Parameter     | Type        | Description                                                      |
+| :------------ | :---------- | :--------------------------------------------------------------- |
+| `hashString`  | `string`    | **Required**. Prepared transaction in base64 |                      |
+
+This structure provides the estimated gas required for a transaction on the Solana network.
+
+- `fee (int)`: This field represents the estimated fee in lamports that the network will charge for processing the transaction. The fee is calculated based on the current network congestion, the computational resources the transaction consumes, and the current fee schedule of the Solana network.
 
 #### Show transaction status
 ```php
@@ -208,22 +248,6 @@ The getBlockInformation function returns an array containing information about a
 - `parentSlot` (int): The slot number of the parent block, indicating the relationship between blocks in the blockchain.
 - `previousBlockhash` (string): The hash of the previous block in the blockchain, establishing the link between consecutive blocks.
 
-#### Show estimated gas
-```php
-$worken->network->getEstimatedGas(string $from, string $to, string $amount)
-```
-| Parameter | Type     | Description                                                                  |
-| :-------  | :------- | :----------------------------------------------------------------------------|
-| `from`    | `string` | **Required**. Sender address in format `0x...`                               |
-| `to`      | `string` | **Required**. Recipient address in format `0x...`                            |
-| `amount`  | `string` | **Required**. Amount in WEI, example: 1 WEI = 0.000000000000000001 of token  |
-
-This structure provides the estimated gas required for a transaction on the Ethereum network, represented in various units: WEI, Ether, and Hex.
-
-- `WEI (string)`: The estimated gas required for the transaction, expressed in WEI, the smallest unit of Ether. Example: "21000"
-- `Ether (string)`: The estimated gas converted into Ether, allowing for an understanding of the cost in more familiar terms. Due to the high granularity of WEI, this number is typically very small and expressed in scientific notation for readability. Example: "0.000000000000021000"
-- `Hex (string)`: The estimated gas required for the transaction, expressed as a hexadecimal value. This format is often used in low-level or system-level interactions with the Ethereum blockchain. Example: "0x5208"
-
 #### Show network status
 ```php
 $worken->network->getNetworkStatus()
@@ -231,20 +255,10 @@ $worken->network->getNetworkStatus()
 This function returns an array containing the following keys and values about Polygon network:
 
 - `latestBlock (int)`: The number of the most recent block in the network.
-Example: `45919144`
+Example: `282854036`
 
-- `hashrate (string)`: The current network hashrate expressed as a string.
-Example: `"0"` (Note: A value of "0" may indicate a lack of available data or a problem with reading the hashrate).
-
-- `gasPrice (array)`: An array containing information about the current gas price in different units:
-  - `WEI (string)`: The gas price expressed in WEI units.
-    Example: `1500000015`
-  - `Ether (string)`: The gas price converted to Ether.
-    Example: `0.000000001500000015`
-  - `Hex (string)`: The gas price expressed as a hexadecimal value.
-    Example: `0x59682f0f`
-- `syncStatus (bool)`: The synchronization status with the blockchain network. true indicates that the node is synchronized, whereas false indicates a lack of synchronization.
-Example: `true`
+- `feeRateLamportsPerSignature (int)`: This key represents the current fee rate in lamports required for each signature in a transaction. This fee is necessary for calculating the total transaction cost when submitting transactions to the network.
+Example: `5000`
 
 #### Show monitor network congestion
 ```php
