@@ -21,16 +21,30 @@ class TransactionService {
     }
 
     /**
-     * Send transaction in Worken SPL token
+     * Prepare transaction in Worken SPL token
      * 
      * @param string $sourcePrivateKey Sender private key in base58
      * @param string $destinationWallet Receiver wallet address
      * @param int $amount Amount to send in WORKEN
-     * @return array
+     * @return string
      */
-    public function sendTransaction(string $sourcePrivateKey, string $destinationWallet, int $amount) {
+    public function prepareTransaction(string $sourcePrivateKey, string $destinationWallet, int $amount): string {
         try {
-            $hashString = TokenProgram::prepareTransaction($sourcePrivateKey, $destinationWallet, $amount, $this->mintAddress, $this->rpcClient);
+            $hashString = TokenProgram::prepareTransaction($sourcePrivateKey, $destinationWallet, $amount, $this->rpcClient, $this->mintAddress);
+            return $hashString;
+        } catch (\Exception $e) {
+            return $e->getMessage();
+        }
+    }
+
+    /**
+     * Send prepared transaction
+     * 
+     * @param string $hashString prepared transaction hash
+     * 
+     */
+    public function sendTransaction(string $hashString) {
+        try {
             $response = $this->client->post($this->rpcClient, [
                 'json' => [
                     'jsonrpc' => '2.0',
@@ -58,15 +72,11 @@ class TransactionService {
     /**
      * Get estimated fee for the transaction
      * 
-     * @param string $sourcePrivateKey Sender private key in base58
-     * @param string $destinationWallet Receiver wallet address
-     * @param int $amount Amount to send in WORKEN
+     * @param string $hashString prepared transaction hash
      * 
-     * @return array
      */
-    public function getEstimatedFee(string $sourcePrivateKey, string $destinationWallet, int $amount) {
+    public function getEstimatedFee(string $hashString) {
         try {
-            $hashString = TokenProgram::prepareTransaction($sourcePrivateKey, $destinationWallet, $amount, $this->mintAddress, $this->rpcClient);
             $response = $this->client->post($this->rpcClient, [
                 'json' => [
                     'jsonrpc' => '2.0',
@@ -118,10 +128,15 @@ class TransactionService {
                 throw new \Exception("Error returned by the API: " . $data['error']['message']);
             }
 
-            if (isset($data['result']) && isset($data['result']['value']) && $data['result']['value'][0]['err'] === null) {
+            if (isset($data['result']) && 
+                isset($data['result']['value']) && 
+                is_array($data['result']['value']) && 
+                isset($data['result']['value'][0]) && 
+                isset($data['result']['value'][0]['err']) && 
+                $data['result']['value'][0]['err'] === null) {
                 return true;
             } else {
-                return false; 
+                return false;
             }
         } catch (\Exception $e) {
             return ['error' => $e->getMessage()];

@@ -51,9 +51,9 @@ class TokenProgram
      * @param string $rpcClient RPC client
      * @param string $mintAddress Mint address
      * 
-     * @return array
+     * @return string Transaction hash
      */
-    public static function prepareTransaction(string $sourcePrivateKey, string $destinationWallet, int $amount, string $rpcClient, string $mintAddress) {
+    public static function prepareTransaction(string $sourcePrivateKey, string $destinationWallet, int $amount, string $rpcClient, string $mintAddress): string {
         $fromBase58 = Buffer::fromBase58($sourcePrivateKey);
         $senderKeyPair = KeyPair::fromSecretKey($fromBase58);
         $receiverPubKey = new PublicKey($destinationWallet);

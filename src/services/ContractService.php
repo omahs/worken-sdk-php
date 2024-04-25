@@ -6,13 +6,13 @@ use GuzzleHttp\Client;
 class ContractService
 {
     private $rpcClient;
-    private $contractAddress;
+    private $mintAddress;
     private $client;
 
-    public function __construct($rpcClient, $contractAddress)
+    public function __construct($rpcClient, $mintAddress)
     {
         $this->rpcClient = $rpcClient;
-        $this->contractAddress = $contractAddress;
+        $this->mintAddress = $mintAddress;
         $this->client = new Client();
     }
 
@@ -32,7 +32,7 @@ class ContractService
                     'id' => 1,
                     'method' => 'getAccountInfo',
                     'params' => [
-                        $this->contractAddress,
+                        $this->mintAddress,
                         ['encoding' => 'jsonParsed']
                     ]
                 ]
@@ -69,7 +69,7 @@ class ContractService
     //                 'id' => 1,
     //                 'method' => 'getAccountInfo',
     //                 'params' => [
-    //                     $this->contractAddress,
+    //                     $this->mintAddress,
     //                     ['encoding' => 'base64']
     //                 ]
     //             ]
