@@ -3,7 +3,7 @@
 </p>
 
 <h3 align="center">
-  Send & Receive secure Blockchain transactions with Worken
+  Send & Receive secure Blockchain transactions on Solana with Worken
 </h3>
 <p align="center">
   🚀 Over 20M+ Users using Worken!
