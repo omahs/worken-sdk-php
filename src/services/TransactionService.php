@@ -21,10 +21,10 @@ class TransactionService {
      * @param string $sourcePrivateKey Sender private key in base58
      * @param string $sourceWallet Sender wallet address
      * @param string $destinationWallet Receiver wallet address
-     * @param float $amount Amount to send in WORKEN
+     * @param float $amount Amount to send in WORKEN | 0.00001 Worken = 1, 0.0001 Worken = 10, 0.001 Worken = 100, 0.01 Worken = 1000, 0.1 Worken = 10000, 1 Worken = 100000
      * @return string
      */
-    public function prepareTransaction(string $sourcePrivateKey, string $sourceWallet, string $destinationWallet, float $amount): string {
+    public function prepareTransaction(string $sourcePrivateKey, string $sourceWallet, string $destinationWallet, int $amount): string {
         try {
             $hashString = TokenProgram::prepareTransaction($sourcePrivateKey, $sourceWallet, $destinationWallet, $amount, $this->rpcClient, $this->mintAddress);
             return $hashString;

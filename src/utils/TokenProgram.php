@@ -24,7 +24,7 @@ class TokenProgram
         PublicKey $fromPubkey,
         PublicKey $toPublicKey,
         PublicKey $ownerPublicKey,
-        float $tokenAmount
+        int $tokenAmount
     ): TransactionInstruction {
         $amount = pack('P', $tokenAmount);  // 'P' for 64-bit unsigned integer, little endian
         $data = pack('C', self::TRANSFER_INDEX) . $amount; // No need for decimals in the data for a transfer instruction
@@ -53,7 +53,7 @@ class TokenProgram
      * 
      * @return string Transaction hash
      */
-    public static function prepareTransaction(string $sourcePrivateKey, string $senderWallet, string $destinationWallet, float $amount, string $rpcClient, string $mintAddress): string {
+    public static function prepareTransaction(string $sourcePrivateKey, string $senderWallet, string $destinationWallet, int $amount, string $rpcClient, string $mintAddress): string {
         $fromBase58 = PublicKey::base58()->decode($sourcePrivateKey);
         $senderKeyPair = KeyPair::fromSecretKey($fromBase58);
         $senderPubKey = new PublicKey($senderWallet);
@@ -76,14 +76,14 @@ class TokenProgram
         $numberDecimals = self::MINT_DECIMALS; // Decimals of SPL token
 
         // Calculate the actual amount to send based on token decimals
-        $tokenAmount = $amount * pow(10, $numberDecimals);
+        // $tokenAmount = $amount * pow(10, $numberDecimals);
 
         // Step 4: Create and send the transaction
         $instruction = TokenProgram::transfer(
             $sourceAccount,
             $destinationAccount,
             $senderPubKey,
-            $tokenAmount
+            $amount
         );
 
         $recentBlockhash = TokenProgram::getRecentBlockhash($rpcClient);
