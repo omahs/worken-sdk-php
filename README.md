@@ -162,13 +162,14 @@ $signature = $worken->transaction->sendTransaction($hashString);
 
 #### Prepare transaction 
 ```php
-$worken->transaction->prepareTransaction(string $sourcePrivateKey, string $destinationWallet, int $amount)
+$worken->transaction->prepareTransaction(string $sourcePrivateKey, string $sourceWallet, string $destinationWallet, float $amount)
 ```
 | Parameter     | Type        | Description                                                      |
 | :------------ | :---------- | :--------------------------------------------------------------- |
 | `sourcePrivateKey`  | `string`    | **Required**. Sender wallet private key to authorize transaction in base58 |                      |
-| `destinationWallet`          | `string`    | **Required**. Receiver wallet address in base58                      |
-| `amount`      | `string`    | **Required**. Amount of WORK token 1 = 0.00001                        |
+| `sourceWallet`  | `string`    | **Required**. Sender wallet address |                      |
+| `destinationWallet`          | `string`    | **Required**. Receiver wallet address                      |
+| `amount`      | `float`    | **Required**. Amount of WORK token                        |
 
 This function prepare transaction in WORK token using Solana blockchain.
 
