@@ -169,7 +169,7 @@ $worken->transaction->prepareTransaction(string $sourcePrivateKey, string $sourc
 | `sourcePrivateKey`  | `string`    | **Required**. Sender wallet private key to authorize transaction in base58 |                      |
 | `sourceWallet`  | `string`    | **Required**. Sender wallet address |                      |
 | `destinationWallet`          | `string`    | **Required**. Receiver wallet address                      |
-| `amount`      | `float`    | **Required**. Amount of WORK token                        |
+| `amount`      | `int`    | **Required**. Amount of WORK token - 1 = 0.00001 WORK, 100000 = 1 WORK                       |
 
 This function prepare transaction in WORK token using Solana blockchain.
 
