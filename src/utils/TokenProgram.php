@@ -23,17 +23,17 @@ class TokenProgram
     public static function transfer(
         PublicKey $fromPubkey,
         PublicKey $toPublicKey,
-        int $tokenAmount
-    ): TransactionInstruction
-    {
-        $amount = pack('V', $tokenAmount);
+        PublicKey $ownerPublicKey,
+        float $tokenAmount
+    ): TransactionInstruction {
+        $amount = pack('P', $tokenAmount);  // 'P' for 64-bit unsigned integer, little endian
+        $data = pack('C', self::TRANSFER_INDEX) . $amount; // No need for decimals in the data for a transfer instruction
 
         $keys = [
-            new AccountMeta($fromPubkey, true, true),
-            new AccountMeta($toPublicKey, false, true)
+            new AccountMeta($fromPubkey, false, true),
+            new AccountMeta($toPublicKey, false, true),
+            new AccountMeta($ownerPublicKey, true, false)
         ];
-
-        $data = pack('C', 2) . $amount;
 
         return new TransactionInstruction(
             new PublicKey(self::TOKEN_PROGRAM_ID),
@@ -53,22 +53,25 @@ class TokenProgram
      * 
      * @return string Transaction hash
      */
-    public static function prepareTransaction(string $sourcePrivateKey, string $destinationWallet, int $amount, string $rpcClient, string $mintAddress): string {
-        $fromBase58 = Buffer::fromBase58($sourcePrivateKey);
+    public static function prepareTransaction(string $sourcePrivateKey, string $senderWallet, string $destinationWallet, float $amount, string $rpcClient, string $mintAddress): string {
+        $fromBase58 = PublicKey::base58()->decode($sourcePrivateKey);
         $senderKeyPair = KeyPair::fromSecretKey($fromBase58);
+        $senderPubKey = new PublicKey($senderWallet);
         $receiverPubKey = new PublicKey($destinationWallet);
         $mintPublicKey = new PublicKey($mintAddress);
         
         // Step 1: Get or create source ATA
         $sourceAccount = TokenProgram::getOrCreateAssociatedTokenAccount(
-            $senderKeyPair, $mintPublicKey, $senderKeyPair->getPublicKey(), $rpcClient
+            $senderKeyPair, $senderPubKey, $mintPublicKey, $senderPubKey, $rpcClient
         );
+        echo "Source account: " . $sourceAccount->toBase58() . "\n";
 
         // Step 2: Get or create destination ATA
         $destinationAccount = TokenProgram::getOrCreateAssociatedTokenAccount(
-            $senderKeyPair, $mintPublicKey, $receiverPubKey, $rpcClient
+            $senderKeyPair, $senderPubKey, $mintPublicKey, $receiverPubKey, $rpcClient
         );
 
+        echo "Destination account: " . $destinationAccount->toBase58() . "\n";
         // Step 3: Fetch the number of decimals for the mint
         $numberDecimals = self::MINT_DECIMALS; // Decimals of SPL token
 
@@ -79,11 +82,12 @@ class TokenProgram
         $instruction = TokenProgram::transfer(
             $sourceAccount,
             $destinationAccount,
+            $senderPubKey,
             $tokenAmount
         );
 
         $recentBlockhash = TokenProgram::getRecentBlockhash($rpcClient);
-        $transaction = new Transaction($recentBlockhash, null, $sourceAccount);
+        $transaction = new Transaction($recentBlockhash, null, $senderPubKey);
         $transaction->add($instruction);
 
         $transaction->sign($senderKeyPair); 
@@ -121,7 +125,7 @@ class TokenProgram
      * @param string $rpc The RPC endpoint URL
      * @return PublicKey The public key of the associated token account
      */
-    public static function getOrCreateAssociatedTokenAccount(KeyPair $ownerKeys, PublicKey $mintPublicKey, PublicKey $accountPublicKey, $rpc)
+    public static function getOrCreateAssociatedTokenAccount(KeyPair $ownerKeys, PublicKey $senderPublicKey, PublicKey $mintPublicKey, PublicKey $accountPublicKey, $rpc)
     {
         $client = new Client();
         // Fetch existing associated token accounts
@@ -153,15 +157,15 @@ class TokenProgram
     
         // No associated account exists, create a new one
         $instruction = self::createAssociatedTokenAccountInstruction(
-            $accountPublicKey,
-            $ownerKeys->getPublicKey(), // Owner is the fee payer
+            $senderPublicKey, // Sender is the fee payer
+            $accountPublicKey, 
             $mintPublicKey,
         );
     
         $recentBlockhash = self::getRecentBlockhash($rpc);
     
         // Create and sign transaction
-        $transaction = new Transaction($recentBlockhash, null, $ownerKeys->getPublicKey()); // Owner is the fee payer
+        $transaction = new Transaction($recentBlockhash, null, $senderPublicKey); // Sender is the fee payer
         $transaction->add($instruction);
     
         $transaction->sign($ownerKeys);

@@ -3,11 +3,6 @@ namespace Worken\Services;
 
 use GuzzleHttp\Client;
 use Worken\Utils\TokenProgram;
-use Tighten\SolanaPhpSdk\KeyPair;
-use Tighten\SolanaPhpSdk\Util\Buffer;
-use Tighten\SolanaPhpSdk\PublicKey;
-use Tighten\SolanaPhpSdk\Transaction;
-
 
 class TransactionService {
     private $rpcClient;
@@ -24,13 +19,14 @@ class TransactionService {
      * Prepare transaction in Worken SPL token
      * 
      * @param string $sourcePrivateKey Sender private key in base58
+     * @param string $sourceWallet Sender wallet address
      * @param string $destinationWallet Receiver wallet address
-     * @param int $amount Amount to send in WORKEN
+     * @param float $amount Amount to send in WORKEN
      * @return string
      */
-    public function prepareTransaction(string $sourcePrivateKey, string $destinationWallet, int $amount): string {
+    public function prepareTransaction(string $sourcePrivateKey, string $sourceWallet, string $destinationWallet, float $amount): string {
         try {
-            $hashString = TokenProgram::prepareTransaction($sourcePrivateKey, $destinationWallet, $amount, $this->rpcClient, $this->mintAddress);
+            $hashString = TokenProgram::prepareTransaction($sourcePrivateKey, $sourceWallet, $destinationWallet, $amount, $this->rpcClient, $this->mintAddress);
             return $hashString;
         } catch (\Exception $e) {
             return $e->getMessage();
