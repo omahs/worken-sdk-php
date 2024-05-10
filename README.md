@@ -155,7 +155,7 @@ require_once 'vendor/autoload.php';
 use Worken\Worken;
 
 $worken = new Worken('MAINNET');
-$hashString = $worken->transaction->prepareTransaction("21ZcK4YbmSPF2dDSBwZ6dSMktcPv7vRREEi86woq8tj3NCxefZfTMFfh5KebNsLrFmCsKchXxPfHSokX24aXtmRK", "DBdtqVQcby2YoPVVAH4jXgubeSR9HANvPrSo24DVUQB5", 5); // example data
+$hashString = $worken->transaction->prepareTransaction("21ZcK4YbmSPF2dDSBwZ6dSMktcPv7vRREEi86woq8tj3NCxefZfTMFfh5KebNsLrFmCsKchXxPfHSokX24aXtmRK", "DBdtqVQcby2YoPVVAH4jXgubeSR9HANvPrSo24DVUQB5", "DBdtqVQcby2YoPVVAH4jXgubeSR9HANvPrSo24DVUQB5", 5); // example data
 $fee = $worken->transaction->getEstimatedFee($hashString);
 $signature = $worken->transaction->sendTransaction($hashString);
 ```
