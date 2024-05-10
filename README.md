@@ -37,7 +37,7 @@ Feel free to try out our provided Postman collection. Simply click the button be
 
 ## Install
 
-Via Composer (tba.)
+Via Composer
 
 ```
 $ composer require paidworkco/worken-sdk
