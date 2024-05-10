@@ -64,14 +64,12 @@ class TokenProgram
         $sourceAccount = TokenProgram::getOrCreateAssociatedTokenAccount(
             $senderKeyPair, $senderPubKey, $mintPublicKey, $senderPubKey, $rpcClient
         );
-        echo "Source account: " . $sourceAccount->toBase58() . "\n";
 
         // Step 2: Get or create destination ATA
         $destinationAccount = TokenProgram::getOrCreateAssociatedTokenAccount(
             $senderKeyPair, $senderPubKey, $mintPublicKey, $receiverPubKey, $rpcClient
         );
-
-        echo "Destination account: " . $destinationAccount->toBase58() . "\n";
+        
         // Step 3: Fetch the number of decimals for the mint
         $numberDecimals = self::MINT_DECIMALS; // Decimals of SPL token
 
