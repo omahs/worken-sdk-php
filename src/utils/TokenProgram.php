@@ -2,46 +2,19 @@
 
 namespace Worken\Utils;
 
+use Worken\Utils\InstructionTypes;
+use Worken\Utils\Instructions;
+use Worken\Utils\Constants;
 use Tighten\SolanaPhpSdk\PublicKey;
 use Tighten\SolanaPhpSdk\TransactionInstruction;
 use Tighten\SolanaPhpSdk\KeyPair;
 use Tighten\SolanaPhpSdk\Transaction;
 use Tighten\SolanaPhpSdk\Util\AccountMeta;
-use Tighten\SolanaPhpSdk\Util\Buffer;
 use StephenHill\Base58;
 use GuzzleHttp\Client;
 
 class TokenProgram
 {
-    const TRANSFER_INDEX = 3; // Transfer SPL instruction index
-    const TOKEN_PROGRAM_ID = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
-    const SYSTEM_PROGRAM_ID = '11111111111111111111111111111111';
-    const ASSOCIATED_TOKEN_PROGRAM_ID = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL';
-    const MINT_TOKEN = '9tnkusLJaycWpkzojAk5jmxkdkxBHRkFNVSsa7tPUgLb'; // Mint WORK token address
-    const MINT_DECIMALS = 5; // WORK token decimals
-    
-    public static function transfer(
-        PublicKey $fromPubkey,
-        PublicKey $toPublicKey,
-        PublicKey $ownerPublicKey,
-        int $tokenAmount
-    ): TransactionInstruction {
-        $amount = pack('P', $tokenAmount);  // 'P' for 64-bit unsigned integer, little endian
-        $data = pack('C', self::TRANSFER_INDEX) . $amount; // No need for decimals in the data for a transfer instruction
-
-        $keys = [
-            new AccountMeta($fromPubkey, false, true),
-            new AccountMeta($toPublicKey, false, true),
-            new AccountMeta($ownerPublicKey, true, false)
-        ];
-
-        return new TransactionInstruction(
-            new PublicKey(self::TOKEN_PROGRAM_ID),
-            $keys,
-            $data
-        );
-    }
-
     /**
      * Prepare transaction
      * 
@@ -53,31 +26,30 @@ class TokenProgram
      * 
      * @return string Transaction hash
      */
-    public static function prepareTransaction(string $sourcePrivateKey, string $senderWallet, string $destinationWallet, int $amount, string $rpcClient, string $mintAddress): string {
+    public static function prepareTransaction(
+        string $sourcePrivateKey, 
+        string $senderWallet, 
+        string $destinationWallet, 
+        int $amount, 
+        string $rpcClient
+        ): string {
         $fromBase58 = PublicKey::base58()->decode($sourcePrivateKey);
         $senderKeyPair = KeyPair::fromSecretKey($fromBase58);
         $senderPubKey = new PublicKey($senderWallet);
         $receiverPubKey = new PublicKey($destinationWallet);
-        $mintPublicKey = new PublicKey($mintAddress);
         
-        // Step 1: Get or create source ATA
         $sourceAccount = TokenProgram::getOrCreateAssociatedTokenAccount(
-            $senderKeyPair, $senderPubKey, $mintPublicKey, $senderPubKey, $rpcClient
+            $senderKeyPair, $senderPubKey, $senderPubKey, $rpcClient
         );
 
-        // Step 2: Get or create destination ATA
         $destinationAccount = TokenProgram::getOrCreateAssociatedTokenAccount(
-            $senderKeyPair, $senderPubKey, $mintPublicKey, $receiverPubKey, $rpcClient
+            $senderKeyPair, $senderPubKey, $receiverPubKey, $rpcClient
         );
         
-        // Step 3: Fetch the number of decimals for the mint
-        $numberDecimals = self::MINT_DECIMALS; // Decimals of SPL token
-
-        // Calculate the actual amount to send based on token decimals
+        //$numberDecimals = Constants::MINT_DECIMALS; // Decimals of SPL token
         // $tokenAmount = $amount * pow(10, $numberDecimals);
 
-        // Step 4: Create and send the transaction
-        $instruction = TokenProgram::transfer(
+        $instruction = Instructions::transferSPL(
             $sourceAccount,
             $destinationAccount,
             $senderPubKey,
@@ -87,6 +59,79 @@ class TokenProgram
         $recentBlockhash = TokenProgram::getRecentBlockhash($rpcClient);
         $transaction = new Transaction($recentBlockhash, null, $senderPubKey);
         $transaction->add($instruction);
+
+        $transaction->sign($senderKeyPair); 
+        $rawBinaryString = $transaction->serialize(false);
+        $hashString = sodium_bin2base64($rawBinaryString, SODIUM_BASE64_VARIANT_ORIGINAL);
+
+        return $hashString;
+    }
+
+    /**
+     * Prepare transaction with burning WORKEN on the sender's wallet
+     * 
+     * @param string $senderPrivateKey Sender private key in base58
+     * @param string $burnerWallet Receiver wallet address
+     * @param int $amount Amount to send in WORKEN
+     * @param string $rpcClient RPC client
+     * @param string $mintAddress Mint address
+     * 
+     * @return string Transaction hash
+     */
+    public static function prepareTransactionWithBurn(
+            string $senderPrivateKey, 
+            string $senderWallet,
+            string $destinationWallet, 
+            int $sendAmount,
+            int $burnAmount,
+            string $rpcClient,
+            int $solAmount
+        ): string 
+        {
+        $senderfromBase58 = PublicKey::base58()->decode($senderPrivateKey);
+        $senderKeyPair = KeyPair::fromSecretKey($senderfromBase58);
+        $senderPubKey = new PublicKey($senderWallet);
+
+        $receiverPubKey = new PublicKey($destinationWallet);
+
+        $sourceAccount = TokenProgram::getOrCreateAssociatedTokenAccount(
+            $senderKeyPair, $senderPubKey, $senderPubKey, $rpcClient
+        );
+
+        $destinationAccount = TokenProgram::getOrCreateAssociatedTokenAccount(
+            $senderKeyPair, $senderPubKey, $receiverPubKey, $rpcClient
+        );
+        
+        // $numberDecimals = Constants::MINT_DECIMALS; // Decimals of SPL token
+        // $tokenAmount = $amount * pow(10, $numberDecimals);
+
+        $transferInstruction = Instructions::transferSPL(
+            $sourceAccount,
+            $destinationAccount,
+            $senderPubKey,
+            $sendAmount
+        );
+
+        $burnInstruction = Instructions::burnSPL(
+            $sourceAccount,
+            $senderPubKey,
+            $burnAmount
+        );
+
+        $recentBlockhash = TokenProgram::getRecentBlockhash($rpcClient);
+        $transaction = new Transaction($recentBlockhash, null, $senderPubKey);
+        $transaction->add($transferInstruction);
+        $transaction->add($burnInstruction);
+
+        // TO DO - Add SOL transfer instruction if $solAmount > 0
+        // if($solAmount > 0) {
+        //     $solTransferInstruction = Instructions::transferSOL(
+        //         $senderPubKey,
+        //         $receiverPubKey,
+        //         $solAmount
+        //     );
+        //     $transaction->add($solTransferInstruction);
+        // }
 
         $transaction->sign($senderKeyPair); 
         $rawBinaryString = $transaction->serialize(false);
@@ -123,9 +168,10 @@ class TokenProgram
      * @param string $rpc The RPC endpoint URL
      * @return PublicKey The public key of the associated token account
      */
-    public static function getOrCreateAssociatedTokenAccount(KeyPair $ownerKeys, PublicKey $senderPublicKey, PublicKey $mintPublicKey, PublicKey $accountPublicKey, $rpc)
+    public static function getOrCreateAssociatedTokenAccount(KeyPair $ownerKeys, PublicKey $senderPublicKey, PublicKey $accountPublicKey, $rpc)
     {
         $client = new Client();
+        $mintPublicKey = new PublicKey(Constants::MINT_TOKEN);
         // Fetch existing associated token accounts
         $response = $client->post($rpc, [
             'json' => [
@@ -212,16 +258,16 @@ class TokenProgram
             new AccountMeta($associatedTokenAccountPublicKey, false, true), // Associated Token Account, not signer, is writable
             new AccountMeta($ownerPublicKey, false, false), // Owner account, not signer, not writable
             new AccountMeta($mintPublicKey, false, false), // Mint account, not signer, not writable
-            new AccountMeta(new PublicKey(self::SYSTEM_PROGRAM_ID), false, false), // System Program, not signer, not writable
-            new AccountMeta(new PublicKey(self::TOKEN_PROGRAM_ID), false, false), // Token Program, not signer, not writable
-            new AccountMeta(new PublicKey(self::ASSOCIATED_TOKEN_PROGRAM_ID), false, false), // Associated Token Program, not signer, not writable
+            new AccountMeta(new PublicKey(Constants::SYSTEM_PROGRAM_ID), false, false), // System Program, not signer, not writable
+            new AccountMeta(new PublicKey(Constants::TOKEN_PROGRAM_ID), false, false), // Token Program, not signer, not writable
+            new AccountMeta(new PublicKey(Constants::ASSOCIATED_TOKEN_PROGRAM_ID), false, false), // Associated Token Program, not signer, not writable
         ];
     
         // Opcode for 'Create Associated Token Account' is usually 1
         $data = pack('C', 1);
     
         return new TransactionInstruction(
-            new PublicKey(self::ASSOCIATED_TOKEN_PROGRAM_ID), 
+            new PublicKey(Constants::ASSOCIATED_TOKEN_PROGRAM_ID), 
             $keys,
             $data
         );
@@ -236,13 +282,13 @@ class TokenProgram
      */
     public static function findAssociatedTokenAddress(PublicKey $ownerPublicKey, PublicKey $mintPublicKey): PublicKey {
         $base58 = new Base58();
-        $binaryKey = new PublicKey($base58->decode(self::TOKEN_PROGRAM_ID));
+        $binaryKey = new PublicKey($base58->decode(Constants::TOKEN_PROGRAM_ID));
         
         return PublicKey::findProgramAddress([
             $ownerPublicKey->toBytes(),
             $binaryKey->toBytes(),
             $mintPublicKey->toBytes()
-        ], new PublicKey(self::ASSOCIATED_TOKEN_PROGRAM_ID))[0];
+        ], new PublicKey(Constants::ASSOCIATED_TOKEN_PROGRAM_ID))[0];
     }
 
     /**

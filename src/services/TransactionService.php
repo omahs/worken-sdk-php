@@ -3,15 +3,16 @@ namespace Worken\Services;
 
 use GuzzleHttp\Client;
 use Worken\Utils\TokenProgram;
+use Worken\Utils\Constants;
 
 class TransactionService {
     private $rpcClient;
     private $mintAddress;
     private $client;
 
-    public function __construct($rpcClient, $mintAddress) {
+    public function __construct($rpcClient) {
         $this->rpcClient = $rpcClient;
-        $this->mintAddress = $mintAddress;
+        $this->mintAddress = Constants::MINT_TOKEN;
         $this->client = new Client();
     }
 
@@ -26,7 +27,28 @@ class TransactionService {
      */
     public function prepareTransaction(string $sourcePrivateKey, string $sourceWallet, string $destinationWallet, int $amount): string {
         try {
-            $hashString = TokenProgram::prepareTransaction($sourcePrivateKey, $sourceWallet, $destinationWallet, $amount, $this->rpcClient, $this->mintAddress);
+            $hashString = TokenProgram::prepareTransaction($sourcePrivateKey, $sourceWallet, $destinationWallet, $amount, $this->rpcClient);
+            return $hashString;
+        } catch (\Exception $e) {
+            return $e->getMessage();
+        }
+    }
+
+    /**
+     * Prepare transaction with burn in Worken SPL token (possible to send SOL too)
+     * 
+     * @param string $sourcePrivateKey Sender private key in base58
+     * @param string $sourceWallet Sender wallet address
+     * @param string $destinationWallet Receiver wallet address
+     * @param float $sendAmount Amount to send in WORKEN
+     * @param float $burnAmount Amount to burn in WORKEN
+     * @param float $solAmount Amount to send in SOL (optional)
+     * 
+     * @return string
+     */
+    public function prepareTransactionWithBurn(string $sourcePrivateKey, string $sourceWallet, string $destinationWallet, int $sendAmount, int $burnAmount, int $solAmount = 0): string {
+        try {
+            $hashString = TokenProgram::prepareTransactionWithBurn($sourcePrivateKey, $sourceWallet, $destinationWallet, $sendAmount, $burnAmount, $this->rpcClient, $solAmount);
             return $hashString;
         } catch (\Exception $e) {
             return $e->getMessage();
@@ -101,7 +123,7 @@ class TransactionService {
      * Get transaction status
      * 
      * @param string $signature Transaction hash
-     * @return int true - success, false - error
+     * @return boolean true - success, false - error
      */
     public function getTransactionStatus(string $signature) {
         try {

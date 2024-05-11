@@ -23,13 +23,12 @@ class Worken {
      * Worken-SDK constructor
      */
     public function __construct($rpcChoice) {
-        $mintAddress = "9tnkusLJaycWpkzojAk5jmxkdkxBHRkFNVSsa7tPUgLb";
         $nodeUrl = $this->resolveRpcUrl($rpcChoice);
 
-        $this->wallet = new WalletService($nodeUrl, $mintAddress);
-        $this->contract = new ContractService($nodeUrl, $mintAddress);
+        $this->wallet = new WalletService($nodeUrl);
+        $this->contract = new ContractService($nodeUrl);
         $this->network = new NetworkService($nodeUrl);
-        $this->transaction = new TransactionService($nodeUrl, $mintAddress);
+        $this->transaction = new TransactionService($nodeUrl);
     }
 
     private function resolveRpcUrl($choice) {

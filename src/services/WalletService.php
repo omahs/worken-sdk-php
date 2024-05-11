@@ -2,8 +2,8 @@
 namespace Worken\Services;
 
 use Tighten\SolanaPhpSdk\Keypair;
-use Tighten\SolanaPhpSdk\PublicKey;
 use Worken\Utils\KeyFactory;
+use Worken\Utils\Constants;
 use GuzzleHttp\Client;
 
 class WalletService {
@@ -11,9 +11,9 @@ class WalletService {
     private $mintAddress;
     private $client;
 
-    public function __construct($rpcClient, $mintAddress) {
+    public function __construct($rpcClient) {
         $this->rpcClient = $rpcClient;
-        $this->mintAddress = $mintAddress;
+        $this->mintAddress = Constants::MINT_TOKEN;
         $this->client = new Client();
     }
 

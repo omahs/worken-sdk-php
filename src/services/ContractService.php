@@ -2,6 +2,7 @@
 namespace Worken\Services;
 
 use GuzzleHttp\Client;
+use Worken\Utils\Constants;
 
 class ContractService
 {
@@ -9,10 +10,10 @@ class ContractService
     private $mintAddress;
     private $client;
 
-    public function __construct($rpcClient, $mintAddress)
+    public function __construct($rpcClient)
     {
         $this->rpcClient = $rpcClient;
-        $this->mintAddress = $mintAddress;
+        $this->mintAddress = Constants::MINT_TOKEN;
         $this->client = new Client();
     }
 
