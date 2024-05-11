@@ -155,14 +155,17 @@ require_once 'vendor/autoload.php';
 use Worken\Worken;
 
 $worken = new Worken('MAINNET');
-$hashString = $worken->transaction->prepareTransaction("21ZcK4YbmSPF2dDSBwZ6dSMktcPv7vRREEi86woq8tj3NCxefZfTMFfh5KebNsLrFmCsKchXxPfHSokX24aXtmRK", "DBdtqVQcby2YoPVVAH4jXgubeSR9HANvPrSo24DVUQB5", "DBdtqVQcby2YoPVVAH4jXgubeSR9HANvPrSo24DVUQB5", 5); // example data
+$hashString = $worken->transaction->prepareTransaction("21ZcK4YbmSPF2dDSBwZ6dSMktcPv7vRREEi86woq8tj3NCxefZfTMFfh5KebNsLrFmCsKchXxPfHSokX24aXtmRK", "DBdtqVQcby2YoPVVAH4jXgubeSR9HANvPrSo24DVUQB5", "DBdtqVQcby2YoPVVAH4jXgubeSR9HANvPrSo24DVUQB5", 5); // example data, 0.00005 WORK sent
 $fee = $worken->transaction->getEstimatedFee($hashString);
 $signature = $worken->transaction->sendTransaction($hashString);
+//Burning tokens with sending works same like prepareTransaction(), its easy!
+$burnHashString = $worken->transaction->prepareTransactionWithBurn("21ZcK4YbmSPF2dDSBwZ6dSMktcPv7vRREEi86woq8tj3NCxefZfTMFfh5KebNsLrFmCsKchXxPfHSokX24aXtmRK", "DBdtqVQcby2YoPVVAH4jXgubeSR9HANvPrSo24DVUQB5", "DBdtqVQcby2YoPVVAH4jXgubeSR9HANvPrSo24DVUQB5", 500, 50); // example data, 0.005 WORK sent, 0.0005 burned
+$burnSignature = $worken->transaction->sendTransaction($hashString);
 ```
 
 #### Prepare transaction 
 ```php
-$worken->transaction->prepareTransaction(string $sourcePrivateKey, string $sourceWallet, string $destinationWallet, float $amount)
+$worken->transaction->prepareTransaction(string $sourcePrivateKey, string $sourceWallet, string $destinationWallet, int $amount)
 ```
 | Parameter     | Type        | Description                                                      |
 | :------------ | :---------- | :--------------------------------------------------------------- |
@@ -172,6 +175,23 @@ $worken->transaction->prepareTransaction(string $sourcePrivateKey, string $sourc
 | `amount`      | `int`    | **Required**. Amount of WORK token - 1 = 0.00001 WORK, 100000 = 1 WORK                       |
 
 This function prepare transaction in WORK token using Solana blockchain.
+
+- `hashString (string)`: Transaction hashString
+
+#### Prepare transaction with burn (Optional to send SOL's too)
+```php
+$worken->transaction->prepareTransactionWithBurn(string $sourcePrivateKey, string $sourceWallet, string $destinationWallet, int $sendAmount, int $burnAmount, int $solAmount = 0)
+```
+| Parameter     | Type        | Description                                                      |
+| :------------ | :---------- | :--------------------------------------------------------------- |
+| `sourcePrivateKey`  | `string`    | **Required**. Sender wallet private key to authorize transaction in base58 |                      |
+| `sourceWallet`  | `string`    | **Required**. Sender wallet address |                      |
+| `destinationWallet`          | `string`    | **Required**. Receiver wallet address                      |
+| `sendAmount`      | `int`    | **Required**. Amount of WORK token you want to send - 1 = 0.00001 WORK, 100000 = 1 WORK                       |
+| `burnAmount`      | `int`    | **Required**. Amount of WORK token that you want to burn - 1 = 0.00001 WORK, 100000 = 1 WORK                       |
+| `solAmount`      | `int`    | Optional. Amount in Lamports that you want to add to the transaction                   |
+
+This function prepare transaction in WORK token using Solana blockchain with burning tokens. You can use this function with sendTransaction like prepareTransaction.
 
 - `hashString (string)`: Transaction hashString
 
