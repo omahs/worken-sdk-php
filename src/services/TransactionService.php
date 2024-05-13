@@ -23,7 +23,7 @@ class TransactionService {
      * @param string $sourceWallet Sender wallet address
      * @param string $destinationWallet Receiver wallet address
      * @param float $amount Amount to send in WORKEN | 0.00001 Worken = 1, 0.0001 Worken = 10, 0.001 Worken = 100, 0.01 Worken = 1000, 0.1 Worken = 10000, 1 Worken = 100000
-     * @return string
+     * @return array
      */
     public function prepareTransaction(string $sourcePrivateKey, string $sourceWallet, string $destinationWallet, int $amount): array {
         try {
@@ -44,7 +44,7 @@ class TransactionService {
      * @param float $burnAmount Amount to burn in WORKEN
      * @param float $solAmount Amount to send in SOL (optional)
      * 
-     * @return string
+     * @return array
      */
     public function prepareTransactionWithBurn(string $sourcePrivateKey, string $sourceWallet, string $destinationWallet, int $sendAmount, int $burnAmount, int $solAmount = 0): array {
         try {
@@ -58,7 +58,7 @@ class TransactionService {
     /**
      * Send prepared transaction
      * 
-     * @param string $hashString prepared transaction hash
+     * @param array $hashString prepared transaction hash
      * 
      */
     public function sendTransaction(array $hashString) {
