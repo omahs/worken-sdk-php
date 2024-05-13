@@ -77,7 +77,7 @@ class TransactionService {
     
             $result = json_decode($response->getBody(), true);
             if (isset($result['error'])) {
-                return ['error' => $result['error']];
+                return "Transaction sending failed: " . $result['error']['message'];
             }
             $signature = $result['result'];
             return $signature;
