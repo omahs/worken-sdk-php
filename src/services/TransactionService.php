@@ -25,12 +25,12 @@ class TransactionService {
      * @param float $amount Amount to send in WORKEN | 0.00001 Worken = 1, 0.0001 Worken = 10, 0.001 Worken = 100, 0.01 Worken = 1000, 0.1 Worken = 10000, 1 Worken = 100000
      * @return string
      */
-    public function prepareTransaction(string $sourcePrivateKey, string $sourceWallet, string $destinationWallet, int $amount): string {
+    public function prepareTransaction(string $sourcePrivateKey, string $sourceWallet, string $destinationWallet, int $amount): array {
         try {
             $hashString = TokenProgram::prepareTransaction($sourcePrivateKey, $sourceWallet, $destinationWallet, $amount, $this->rpcClient);
-            return $hashString;
+            return ['success' => true, 'data' => $hashString];
         } catch (\Exception $e) {
-            return $e->getMessage();
+            return ['success' => false, 'data' => $e->getMessage()];
         }
     }
 
@@ -46,12 +46,12 @@ class TransactionService {
      * 
      * @return string
      */
-    public function prepareTransactionWithBurn(string $sourcePrivateKey, string $sourceWallet, string $destinationWallet, int $sendAmount, int $burnAmount, int $solAmount = 0): string {
+    public function prepareTransactionWithBurn(string $sourcePrivateKey, string $sourceWallet, string $destinationWallet, int $sendAmount, int $burnAmount, int $solAmount = 0): array {
         try {
             $hashString = TokenProgram::prepareTransactionWithBurn($sourcePrivateKey, $sourceWallet, $destinationWallet, $sendAmount, $burnAmount, $this->rpcClient, $solAmount);
-            return $hashString;
+            return ['success' => true, 'data' => $hashString];
         } catch (\Exception $e) {
-            return $e->getMessage();
+            return ['success' => false, 'data' => $e->getMessage()];
         }
     }
 
@@ -61,15 +61,18 @@ class TransactionService {
      * @param string $hashString prepared transaction hash
      * 
      */
-    public function sendTransaction(string $hashString) {
+    public function sendTransaction(array $hashString) {
         try {
+            if($hashString['success'] == false) {
+                return $hashString;
+            }
             $response = $this->client->post($this->rpcClient, [
                 'json' => [
                     'jsonrpc' => '2.0',
                     'id' => 1,
                     'method' => 'sendTransaction',
                     'params' => [
-                        $hashString,
+                        $hashString['data'],
                         ['encoding' => 'base64']
                     ]
                 ]
@@ -77,12 +80,12 @@ class TransactionService {
     
             $result = json_decode($response->getBody(), true);
             if (isset($result['error'])) {
-                return "Transaction sending failed: " . $result['error']['message'];
+                return ['success' => false, 'data' => $result['error']];
             }
             $signature = $result['result'];
-            return $signature;
+            return ['success' => true, 'data' => $signature];
         } catch (\Exception $e) {
-            return ['error' => $e->getMessage()];
+            return ['success' => false, 'data' => $e->getMessage()];
         }
     }
 
