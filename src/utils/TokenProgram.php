@@ -2,7 +2,6 @@
 
 namespace Worken\Utils;
 
-use Worken\Utils\InstructionTypes;
 use Worken\Utils\Instructions;
 use Worken\Utils\Constants;
 use Tighten\SolanaPhpSdk\PublicKey;
@@ -124,14 +123,18 @@ class TokenProgram
         $transaction->add($burnInstruction);
 
         // TO DO - Add SOL transfer instruction if $solAmount > 0
-        // if($solAmount > 0) {
-        //     $solTransferInstruction = Instructions::transferSOL(
-        //         $senderPubKey,
-        //         $receiverPubKey,
-        //         $solAmount
-        //     );
-        //     $transaction->add($solTransferInstruction);
-        // }
+        if($solAmount > 0) {
+            $minimumRent = TokenProgram::getMinimumBalanceForRentExemption($rpcClient);
+            if ($solAmount < $minimumRent) {
+                throw new \Exception("SOL Amount is less than minimum rent.");
+            }
+            $solTransferInstruction = Instructions::transferSOL(
+                $senderPubKey,
+                $receiverPubKey,
+                $solAmount
+            );
+            $transaction->add($solTransferInstruction);
+        }
 
         $transaction->sign($senderKeyPair); 
         $rawBinaryString = $transaction->serialize(false);
@@ -312,6 +315,26 @@ class TokenProgram
             return $blockhashResponse['result']['value']['blockhash'];
         } else {
             throw new \Exception("Failed to fetch recent blockhash.");
+        }
+    }
+
+    public static function getMinimumBalanceForRentExemption($rpc) {
+        $client = new Client();
+        $response = $client->post($rpc, [
+            'json' => [
+                'jsonrpc' => '2.0',
+                'id' => 1,
+                'method' => 'getMinimumBalanceForRentExemption',
+                "params" => [50]
+            ]
+        ]);
+    
+        $minimumRent = json_decode($response->getBody(), true);
+        
+        if (!isset($minimumRent['error']) && isset($minimumRent['result'])) {
+            return $minimumRent['result'];
+        } else {
+            throw new \Exception("Failed to fetch minimum balance for rent excemption.");
         }
     }
 }
