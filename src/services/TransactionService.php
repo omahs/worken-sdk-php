@@ -18,25 +18,25 @@ class TransactionService {
 
     /**
      * Prepare transaction in Worken SPL token
-     * 
+     *
      * @param string $sourcePrivateKey Sender private key in base58
      * @param string $sourceWallet Sender wallet address
      * @param string $destinationWallet Receiver wallet address
-     * @param float $amount Amount to send in WORKEN | 0.00001 Worken = 1, 0.0001 Worken = 10, 0.001 Worken = 100, 0.01 Worken = 1000, 0.1 Worken = 10000, 1 Worken = 100000
+     * @param float $amount Amount to send in WORKEN
      * @return array
      */
     public function prepareTransaction(string $sourcePrivateKey, string $sourceWallet, string $destinationWallet, int $amount): array {
         try {
             $hashString = TokenProgram::prepareTransaction($sourcePrivateKey, $sourceWallet, $destinationWallet, $amount, $this->rpcClient);
-            return ['success' => true, 'data' => $hashString];
+            return ['success' => true, 'message' => 'Transaction prepared successfully', 'data' => $hashString];
         } catch (\Exception $e) {
-            return ['success' => false, 'data' => $e->getMessage()];
+            return ['success' => false, 'message' => 'Error preparing transaction: ' . $e->getMessage(), 'data' => null];
         }
     }
 
     /**
      * Prepare transaction with burn in Worken SPL token (possible to send SOL too)
-     * 
+     *
      * @param string $sourcePrivateKey Sender private key in base58
      * @param string $sourceWallet Sender wallet address
      * @param string $destinationWallet Receiver wallet address
@@ -49,22 +49,22 @@ class TransactionService {
     public function prepareTransactionWithBurn(string $sourcePrivateKey, string $sourceWallet, string $destinationWallet, int $sendAmount, int $burnAmount, int $solAmount = 0): array {
         try {
             $hashString = TokenProgram::prepareTransactionWithBurn($sourcePrivateKey, $sourceWallet, $destinationWallet, $sendAmount, $burnAmount, $this->rpcClient, $solAmount);
-            return ['success' => true, 'data' => $hashString];
+            return ['success' => true, 'message' => 'Transaction with burn prepared successfully', 'data' => $hashString];
         } catch (\Exception $e) {
-            return ['success' => false, 'data' => $e->getMessage()];
+            return ['success' => false, 'message' => 'Error preparing transaction with burn: ' . $e->getMessage(), 'data' => null];
         }
     }
 
     /**
      * Send prepared transaction
-     * 
-     * @param array $hashString prepared transaction hash
-     * 
+     *
+     * @param array $hashString Prepared transaction hash
+     * @return array
      */
     public function sendTransaction(array $hashString) {
         try {
-            if($hashString['success'] == false) {
-                return $hashString;
+            if ($hashString['success'] === false) {
+                return ['success' => false, 'message' => $hashString['message'], 'data' => null];
             }
             $response = $this->client->post($this->rpcClient, [
                 'json' => [
@@ -77,15 +77,22 @@ class TransactionService {
                     ]
                 ]
             ]);
-    
+
             $result = json_decode($response->getBody(), true);
             if (isset($result['error'])) {
-                return ['success' => false, 'data' => $result['error']];
+                if (isset($result['error']['data']['logs'])) {
+                    foreach ($result['error']['data']['logs'] as $log) {
+                        if (strpos($log, 'insufficient funds') !== false) {
+                            return ['success' => false, 'message' => 'Transaction failed: insufficient funds', 'data' => null];
+                        }
+                    }
+                }
+                return ['success' => false, 'message' => 'Transaction failed: ' . $result['error']['message'], 'data' => null];
             }
             $signature = $result['result'];
-            return ['success' => true, 'data' => $signature];
+            return ['success' => true, 'message' => 'Transaction sent successfully', 'data' => $signature];
         } catch (\Exception $e) {
-            return ['success' => false, 'data' => $e->getMessage()];
+            return ['success' => false, 'message' => 'Error sending transaction: ' . $e->getMessage(), 'data' => null];
         }
     }
 
